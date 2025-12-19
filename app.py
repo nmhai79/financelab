@@ -138,6 +138,19 @@ st.markdown("""
     .ai-box p, .ai-box li {
         color: #333333 !important; /* Đảm bảo nội dung con cũng màu đen */
     }
+
+    /* --- NÚT AI ĐỒNG BỘ (NỀN ĐỎ CHỮ TRẮNG) --- */
+    div[data-testid="stButton"] > button[kind="primary"] {
+        background-color: #ff2b2b !important;
+        color: white !important;
+        border: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+    }
+    div[data-testid="stButton"] > button[kind="primary"]:hover {
+        background-color: #d32f2f !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
     
     /* Copyright Footer */
     .copyright {
@@ -265,7 +278,8 @@ if "1." in room:
         
         # --- BỔ SUNG AI CHO PHÒNG 1 ---
         st.markdown("---")
-        if st.button("🤖 Senior Trader AI: Đánh giá cơ hội này"):
+        # NÚT AI ĐỒNG BỘ: type="primary" -> CSS sẽ biến thành màu đỏ
+        if st.button("🤖 Hỏi AI Trader: Đánh giá rủi ro", type="primary"):
             if api_key:
                 # Tính toán lại giá trị để gửi cho AI
                 s1 = 1000000 / bank_b
@@ -349,7 +363,8 @@ elif "2." in room:
 
     # --- BỔ SUNG AI CHO PHÒNG 2 ---
     st.markdown("---")
-    if st.button("🤖 CFO Advisor AI: Phản biện chiến lược"):
+    # NÚT AI ĐỒNG BỘ
+    if st.button("🤖 Hỏi AI CFO: Phản biện chiến lược", type="primary"):
         if api_key:
             context = f"""
             Dự báo Spot tương lai của user: {future_spot}.
@@ -427,7 +442,8 @@ elif "3." in room:
 
         # --- BỔ SUNG AI CHO PHÒNG 3 ---
         st.markdown("---")
-        if st.button("🤖 Legal Advisor AI: Tư vấn UCP 600"):
+        # NÚT AI ĐỒNG BỘ
+        if st.button("🤖 Hỏi AI Luật sư: Tư vấn UCP 600", type="primary"):
             if api_key:
                 # Kiểm tra lại trạng thái để lấy dữ liệu mới nhất
                 curr_errs = []
@@ -501,7 +517,8 @@ elif "4." in room:
 
     # --- BỔ SUNG AI CHO PHÒNG 4 ---
     st.markdown("---")
-    if st.button("🤖 Strategic Analyst AI: Phân tích Vĩ mô"):
+    # NÚT AI ĐỒNG BỘ
+    if st.button("🤖 Hỏi AI Chiến lược: Phân tích vĩ mô", type="primary"):
         if api_key:
             context = f"Vốn: {inv}$. Dòng tiền: {cf}$/năm. Mất giá nội tệ: {depre}%/năm. WACC: {wacc}%."
             task = "Phân tích SWOT nhanh về dự án này. Ngoài tài chính, nhà đầu tư cần lo ngại gì về vĩ mô (Lạm phát, chính trị, chuyển lợi nhuận về nước)?"
@@ -547,7 +564,8 @@ elif "5." in room:
     # Nút bấm gọi AI (On-demand)
     col_ai_btn, col_ai_space = st.columns([1, 2])
     with col_ai_btn:
-        run_ai = st.button("🤖 YÊU CẦU CHUYÊN GIA AI PHÂN TÍCH", type="primary", use_container_width=True)
+        # NÚT AI ĐỒNG BỘ: Đổi văn phong chữ thường, giữ use_container_width
+        run_ai = st.button("🤖 Hỏi AI Cố vấn: Phân tích chính sách", type="primary", use_container_width=True)
     
     if run_ai:
         if not api_key:
@@ -571,4 +589,3 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
-

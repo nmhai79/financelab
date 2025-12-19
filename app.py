@@ -170,7 +170,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.info("💡 **Gợi ý:** Sau khi bấm nút tính toán, hãy mở các mục **'Giải thích chi tiết'** để hiểu bản chất nghiệp vụ.")
+    st.info("💡 **Gợi ý:** Sau khi tính toán, hãy xem **'Giải thích'** hoặc gọi **'Chuyên gia AI'** để được tư vấn sâu hơn.")
     
     # --- BẢN QUYỀN (Copyright) ---
     st.markdown("---")
@@ -571,3 +571,4 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
+

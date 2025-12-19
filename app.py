@@ -29,7 +29,7 @@ if api_key:
 def ask_gemini_macro(debt_increase, shock_percent, new_rate):
     """Hàm gọi AI để phân tích vĩ mô"""
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash') # Dùng bản Flash cho nhanh
+        model = genai.GenerativeModel('gemini-2.0-flash') # Dùng bản Flash cho nhanh
         prompt = f"""
         Đóng vai một Cố vấn Kinh tế cấp cao của Chính phủ (Economic Advisor).
         
@@ -458,3 +458,4 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
+

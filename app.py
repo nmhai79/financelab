@@ -4,7 +4,7 @@ import numpy as np
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(
-    page_title="BDU Finance Lab", 
+    page_title="Finance Lab", 
     layout="wide", 
     initial_sidebar_state="expanded",
     page_icon="🏦"
@@ -63,7 +63,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🏦 BDU INTERNATIONAL FINANCE LAB")
+st.title("🏦 INTERNATIONAL FINANCE LAB")
 st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế")
 
 # --- MENU NAVIGATION (SIDEBAR CHUẨN) ---
@@ -386,3 +386,4 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
+

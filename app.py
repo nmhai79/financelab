@@ -25,35 +25,50 @@ except (FileNotFoundError, KeyError):
 if api_key:
     genai.configure(api_key=api_key)
 
-# Hàm gọi AI (Được cache để tối ưu)
-def ask_gemini_macro(debt_increase, shock_percent, new_rate):
-    """Hàm gọi AI để phân tích vĩ mô"""
+# --- HÀM GỌI AI CHUNG (GENERIC AI FUNCTION) ---
+def ask_gemini_generic(role, context_data, question_type):
+    """
+    Hàm gọi AI đa năng cho các phòng ban.
+    - role: Vai trò của AI (VD: Senior Trader, Legal Advisor)
+    - context_data: Dữ liệu đầu vào (Text hoặc số liệu)
+    - question_type: Loại câu hỏi (VD: 'risk_warning', 'legal_check')
+    """
     try:
-        # SỬA LỖI 1: Dùng 'gemini-pro' thay vì 'gemini-1.5-flash' để tương thích tốt hơn
-        model = genai.GenerativeModel('gemini-2.0-flash') 
+        # Sử dụng model ổn định (gemini-1.5-flash hoặc gemini-pro)
+        model = genai.GenerativeModel('gemini-1.5-flash') 
         
+        # Xây dựng Prompt dựa trên ngữ cảnh
         prompt = f"""
-        Đóng vai một Cố vấn Kinh tế cấp cao của Chính phủ (Economic Advisor).
+        Bạn là: {role}.
+        Dữ liệu hiện tại: {context_data}
         
-        Tình huống hiện tại:
-        - Đồng nội tệ vừa mất giá: {shock_percent}%
-        - Tỷ giá mới: {new_rate:,.0f} VND/USD
-        - Hậu quả tài khóa: Gánh nặng nợ công quốc gia vừa tăng thêm {debt_increase:,.0f} Tỷ VND do chênh lệch tỷ giá.
-        
-        Yêu cầu:
-        Hãy viết một báo cáo ngắn gọn (khoảng 3 gạch đầu dòng lớn) cảnh báo Chính phủ về 3 tác động thực tế đến đời sống người dân và doanh nghiệp (Ví dụ: Lạm phát nhập khẩu, Giá xăng dầu, Áp lực thuế).
-        Văn phong: Trang trọng, cảnh báo rủi ro, chuyên nghiệp. Không dùng Markdown đậm nhạt quá nhiều.
+        Nhiệm vụ:
         """
+        
+        if question_type == "arbitrage_check":
+            prompt += "Phân tích rủi ro của cơ hội chênh lệch giá này. Cảnh báo về thanh khoản, độ trượt giá (slippage) và tốc độ khớp lệnh. Đưa ra lời khuyên ngắn gọn cho Trader mới."
+        elif question_type == "hedging_advice":
+            prompt += "Đóng vai 'Devil's Advocate' (Người phản biện). Hãy chỉ ra rủi ro tâm lý và tài chính nếu thị trường đi NGƯỢC lại dự đoán của người dùng. Tại sao công cụ họ chọn có thể gây tiếc nuối?"
+        elif question_type == "ucp600_advice":
+            prompt += "Dựa trên quy tắc UCP 600. Hãy giải thích tại sao các lỗi chứng từ trên lại nghiêm trọng và dẫn đến việc ngân hàng từ chối thanh toán? (Giải thích ngắn gọn pháp lý)."
+        elif question_type == "fdi_swot":
+            prompt += "Dự án có NPV dương nhưng rủi ro tỷ giá cao. Hãy phân tích SWOT nhanh về các yếu tố phi tài chính (Chính trị, lạm phát, chuyển lợi nhuận về nước) mà CFO cần lo lắng."
+        elif question_type == "macro_shock":
+            prompt += "Viết báo cáo ngắn (3 gạch đầu dòng) cảnh báo Chính phủ về tác động thực tế đến đời sống (Lạm phát, Xăng dầu, Thuế) do nợ công tăng."
+
+        prompt += "\n\nVăn phong: Chuyên nghiệp, ngắn gọn, đi thẳng vào vấn đề. Định dạng rõ ràng."
+        
         response = model.generate_content(prompt)
         return response.text
+
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg:
-            return "⚠️ Hệ thống đang quá tải (Hết lượt dùng miễn phí). Vui lòng thử lại sau 1-2 phút."
+            return "⚠️ Hệ thống AI đang quá tải (Hết quota miễn phí). Vui lòng thử lại sau."
         elif "404" in error_msg:
-            return "⚠️ Lỗi Model AI: Tài khoản Google của bạn không hỗ trợ Model này. Vui lòng tạo API Key bằng Gmail cá nhân."
+            return "⚠️ Lỗi Model: Tài khoản của bạn chưa hỗ trợ model này. Hãy thử tạo Key mới."
         else:
-            return f"⚠️ Lỗi kết nối AI: {error_msg}"
+            return f"⚠️ Lỗi kết nối: {error_msg}"
 
 # --- CSS GIAO DIỆN (THEME XANH DƯƠNG CHUYÊN NGHIỆP) ---
 st.markdown("""
@@ -128,7 +143,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏦 INTERNATIONAL FINANCE LAB")
-st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế")
+st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế (AI Integrated)")
 
 # --- MENU NAVIGATION (SIDEBAR CHUẨN) ---
 with st.sidebar:
@@ -148,7 +163,7 @@ with st.sidebar:
     )
     
     st.markdown("---")
-    st.info("💡 **Gợi ý:** Sau khi bấm nút tính toán, hãy mở các mục **'Giải thích chi tiết'** để hiểu bản chất nghiệp vụ.")
+    st.info("💡 **Tips:** Các phòng ban hiện đã có nút **'🤖 Hỏi AI'** để nhận tư vấn chuyên sâu.")
     
     # --- BẢN QUYỀN (Copyright) ---
     st.markdown("---")
@@ -170,6 +185,7 @@ if "1." in room:
     tab1, tab2 = st.tabs(["🔢 Niêm yết Tỷ giá Chéo", "⚡ Săn Arbitrage (Tam giác)"])
     
     with tab1:
+        # Code cũ của Tab 1
         c1, c2 = st.columns(2)
         with c1:
             st.subheader("Thị trường 1: USD/VND")
@@ -184,28 +200,11 @@ if "1." in room:
             cross_bid = eur_bid * usd_bid
             cross_ask = eur_ask * usd_ask
             spread = cross_ask - cross_bid
-            
             st.success(f"✅ TỶ GIÁ EUR/VND NIÊM YẾT: {cross_bid:,.0f} - {cross_ask:,.0f}")
             st.info(f"Spread (Chênh lệch giá): {spread:,.0f} VND")
             
-            # --- PHẦN GIẢI THÍCH ---
-            with st.expander("🎓 GIẢI THÍCH CÔNG THỨC & NGHIỆP VỤ", expanded=True):
-                st.markdown(r"""
-                **1. Công thức toán học:**
-                $$
-                \text{EUR/VND}_{Bid} = \text{EUR/USD}_{Bid} \times \text{USD/VND}_{Bid}
-                $$
-                $$
-                \text{EUR/VND}_{Ask} = \text{EUR/USD}_{Ask} \times \text{USD/VND}_{Ask}
-                $$
-                
-                **2. Giải thích nghiệp vụ:**
-                Tại sao lại nhân `Bid x Bid`?
-                * Để Ngân hàng Mua EUR (trả VND) cho khách, ngân hàng phải thực hiện 2 bước trên thị trường quốc tế:
-                    1.  Mua EUR (trả bằng USD) -> Dùng tỷ giá **EUR/USD Bid**.
-                    2.  Bán ngay số USD đó (để lấy VND trả khách) -> Dùng tỷ giá mua USD của thị trường (tức **USD/VND Bid**).
-                * Do đó, Tỷ giá chéo Bid là tích của 2 tỷ giá Bid thành phần.
-                """)
+            with st.expander("🎓 GIẢI THÍCH CÔNG THỨC"):
+                st.write("Bid chéo = Bid 1 x Bid 2 (Nguyên tắc: Ngân hàng luôn mua thấp)")
 
     with tab2:
         st.write("Vốn kinh doanh: **1,000,000 USD**")
@@ -214,18 +213,25 @@ if "1." in room:
         with k2: bank_b = st.number_input("Bank B (EUR/USD):", value=1.1000)
         with k3: bank_c = st.number_input("Bank C (EUR/VND):", value=28000.0)
         
-        if st.button("🔍 CHẠY MÔ HÌNH DÒNG TIỀN"):
+        col_calc, col_ai_1 = st.columns([1, 1])
+        with col_calc:
+            btn_calc = st.button("🔍 CHẠY MÔ HÌNH DÒNG TIỀN")
+        
+        # Biến tạm để lưu kết quả cho AI
+        profit = 0
+        
+        if btn_calc:
             step1_eur = 1000000 / bank_b
             step2_vnd = step1_eur * bank_c
             step3_usd = step2_vnd / bank_a
             profit = step3_usd - 1000000
             
-            st.markdown("### 📝 Nhật ký giao dịch chi tiết:")
+            st.markdown("### 📝 Nhật ký giao dịch:")
             st.markdown(f"""
             <div class="step-box">
-            1. <b>Bán USD tại Bank B:</b> 1,000,000 / {bank_b} = <b>{step1_eur:,.2f} EUR</b><br>
-            2. <b>Bán EUR tại Bank C:</b> {step1_eur:,.2f} x {bank_c} = <b>{step2_vnd:,.0f} VND</b><br>
-            3. <b>Mua lại USD tại Bank A:</b> {step2_vnd:,.0f} / {bank_a} = <b>{step3_usd:,.2f} USD</b>
+            1. USD -> EUR: {step1_eur:,.2f} EUR<br>
+            2. EUR -> VND: {step2_vnd:,.0f} VND<br>
+            3. VND -> USD: {step3_usd:,.2f} USD
             </div>
             """, unsafe_allow_html=True)
             
@@ -233,12 +239,24 @@ if "1." in room:
                 st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit:,.2f} USD</div>', unsafe_allow_html=True)
             else:
                 st.error(f"⚠️ THUA LỖ: {profit:,.2f} USD")
-            
-            with st.expander("🎓 BẢN CHẤT ARBITRAGE"):
-                st.write("""
-                Cơ hội kinh doanh chênh lệch giá (Arbitrage) xuất hiện khi tỷ giá chéo tính toán (Lý thuyết) khác với tỷ giá chéo thực tế trên thị trường.
-                Trong trường hợp này, dòng tiền chạy theo vòng tròn (USD -> EUR -> VND -> USD) để tận dụng sự định giá sai lệch giữa các ngân hàng.
-                """)
+        
+        # --- AI INTEGRATION ROOM 1 ---
+        st.markdown("---")
+        if st.button("🤖 AI TRADER: ĐÁNH GIÁ CƠ HỘI NÀY"):
+            if not api_key:
+                st.warning("⚠️ Cần nhập API Key để dùng AI.")
+            else:
+                # Tính lại để lấy số liệu mới nhất đưa vào Prompt
+                s1 = 1000000 / bank_b
+                s2 = s1 * bank_c
+                s3 = s2 / bank_a
+                prof = s3 - 1000000
+                
+                context = f"Vốn 1tr USD. Lợi nhuận Arbitrage tính toán: {prof:,.2f} USD. Tỷ giá các chặng: {bank_a}, {bank_b}, {bank_c}."
+                
+                with st.spinner("Senior Trader đang phân tích thanh khoản..."):
+                    advice = ask_gemini_generic("Senior FX Trader", context, "arbitrage_check")
+                    st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN TỪ SENIOR TRADER</h4>{advice}</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # PHÒNG 2: RISK MANAGEMENT
@@ -249,61 +267,64 @@ elif "2." in room:
     st.markdown("""
     <div class="role-card">
         <div class="role-title">👤 Vai diễn: Giám đốc Tài chính (CFO)</div>
-        <div class="mission-text">"Nhiệm vụ: Tính toán tỷ giá kỳ hạn (Forward) theo lãi suất và chọn công cụ phòng vệ (Hedging) tối ưu cho khoản phải trả 1 triệu USD sau 90 ngày."</div>
+        <div class="mission-text">"Nhiệm vụ: Tính toán tỷ giá kỳ hạn (Forward) và chọn công cụ phòng vệ (Hedging)."</div>
     </div>
     """, unsafe_allow_html=True)
 
-    st.subheader("1. Tính toán Tỷ giá Kỳ hạn (IRP Model)")
+    # 1. IRP
+    st.subheader("1. Tính toán Tỷ giá Forward")
     col_irp1, col_irp2 = st.columns(2)
     with col_irp1:
-        spot_irp = st.number_input("Spot Rate (Hiện tại):", value=25000.0)
-        days = st.number_input("Kỳ hạn vay (Ngày):", value=90)
+        spot_irp = st.number_input("Spot Rate:", value=25000.0)
+        days = st.number_input("Kỳ hạn (Ngày):", value=90)
     with col_irp2:
-        r_vnd = st.number_input("Lãi suất VND (%/năm):", value=6.0)
-        r_usd = st.number_input("Lãi suất USD (%/năm):", value=3.0)
+        r_vnd = st.number_input("Lãi suất VND (%):", value=6.0)
+        r_usd = st.number_input("Lãi suất USD (%):", value=3.0)
         
     fwd_cal = spot_irp * (1 + (r_vnd/100)*(days/360)) / (1 + (r_usd/100)*(days/360))
-    st.success(f"👉 Tỷ giá Forward lý thuyết (theo IRP): **{fwd_cal:,.2f} VND/USD**")
-
-    with st.expander("🎓 GIẢI THÍCH CÔNG THỨC IRP"):
-        st.latex(r"F = S \times \frac{1 + r_{VND} \times \frac{n}{360}}{1 + r_{USD} \times \frac{n}{360}}")
-        st.write("""
-        **Quy luật Ngang giá Lãi suất (Interest Rate Parity):**
-        Đồng tiền nào có lãi suất cao hơn (ở đây là VND: 6% > USD: 3%) thì đồng tiền đó sẽ bị giảm giá trong tương lai (Forward > Spot) để bù trừ cho phần chênh lệch lãi suất. 
-        Nếu không, nhà đầu tư sẽ đổ xô đi gửi tiết kiệm đồng tiền lãi suất cao, gây mất cân bằng thị trường.
-        """)
+    st.success(f"👉 Tỷ giá Forward lý thuyết: **{fwd_cal:,.2f} VND/USD**")
 
     st.markdown("---")
-    st.subheader("2. Ma trận Ra quyết định (Decision Matrix)")
+    st.subheader("2. Ra quyết định Hedging")
     
     c1, c2 = st.columns([1, 2])
     with c1:
         f_rate_input = st.number_input("Giá Forward ký với NH:", value=fwd_cal)
-        strike = st.number_input("Giá thực hiện (Strike Price):", value=25200.0)
+        strike = st.number_input("Strike Price (Option):", value=25200.0)
         premium = st.number_input("Phí Option (VND/USD):", value=150.0)
     with c2:
-        future_spot = st.slider("Dự báo Tỷ giá thị trường ngày đáo hạn:", 24000.0, 26000.0, 25300.0)
+        future_spot = st.slider("Dự báo Spot ngày đáo hạn:", 24000.0, 26000.0, 25300.0)
         
+        # Logic tính toán
         cost_open = 1000000 * future_spot
         cost_fwd = 1000000 * f_rate_input
-        
         if future_spot > strike:
-            opt_action = "Thực hiện quyền"
-            final_price = strike
+            final_opt = strike
         else:
-            opt_action = "Bỏ quyền (Mua giá chợ)"
-            final_price = future_spot
-        cost_opt = (1000000 * final_price) + (1000000 * premium)
-            
+            final_opt = future_spot
+        cost_opt = (1000000 * final_opt) + (1000000 * premium)
+        
         df = pd.DataFrame({
-            "Chiến lược": ["1. Không phòng vệ (Open)", "2. Hợp đồng Kỳ hạn (Forward)", "3. Quyền chọn Mua (Option)"],
-            "Diễn giải": [f"Mua giá {future_spot:,.0f}", f"Mua giá {f_rate_input:,.0f} (Cố định)", f"{opt_action} + Phí"],
-            "Tổng chi phí (VND)": [cost_open, cost_fwd, cost_opt]
+            "Chiến lược": ["Open (Không làm gì)", "Forward", "Option"],
+            "Tổng chi phí": [cost_open, cost_fwd, cost_opt]
         })
         st.table(df)
         
-        best = df.loc[df['Tổng chi phí (VND)'].idxmin()]
-        st.markdown(f'<div class="result-box">🏆 KIẾN NGHỊ: Chọn <b>{best["Chiến lược"]}</b> (Tiết kiệm nhất).</div>', unsafe_allow_html=True)
+        # --- AI INTEGRATION ROOM 2 ---
+        st.markdown("---")
+        if st.button("🤖 AI RISK: PHẢN BIỆN KỊCH BẢN (WHAT-IF)"):
+            if not api_key:
+                st.warning("⚠️ Cần nhập API Key.")
+            else:
+                best_choice = df.loc[df['Tổng chi phí'].idxmin()]['Chiến lược']
+                context = f"""
+                User dự báo tỷ giá tương lai là {future_spot}. 
+                Dựa trên dự báo này, chiến lược rẻ nhất là: {best_choice}.
+                Spot hiện tại: {spot_irp}. Forward: {f_rate_input}. Strike: {strike}.
+                """
+                with st.spinner("Risk Manager đang chạy mô phỏng rủi ro..."):
+                    advice = ask_gemini_generic("Risk Manager", context, "hedging_advice")
+                    st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN QUẢN TRỊ RỦI RO</h4>{advice}</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # PHÒNG 3: TRADE FINANCE
@@ -314,52 +335,51 @@ elif "3." in room:
     st.markdown("""
     <div class="role-card">
         <div class="role-title">👤 Vai diễn: Chuyên viên Thanh toán Quốc tế</div>
-        <div class="mission-text">"Nhiệm vụ: Tư vấn phương thức thanh toán tối ưu chi phí và kiểm tra bộ chứng từ (Checking) theo chuẩn UCP 600."</div>
+        <div class="mission-text">"Nhiệm vụ: Tư vấn phương thức thanh toán và kiểm tra bộ chứng từ (Checking) theo UCP 600."</div>
     </div>
     """, unsafe_allow_html=True)
     
-    tab_cost, tab_check = st.tabs(["💰 Bài toán Chi phí (L/C vs T/T)", "📝 Kiểm tra Chứng từ (Checking)"])
+    tab_cost, tab_check = st.tabs(["💰 L/C vs T/T", "📝 Kiểm tra Chứng từ"])
     
     with tab_cost:
-        val = st.number_input("Giá trị hợp đồng (USD):", value=100000)
-        if st.button("TÍNH PHÍ GIAO DỊCH"):
-            tt_fee = val * 0.002 + 20
-            lc_fee = val * 0.01 + 100
-            
-            st.write(f"🔹 **Chuyển tiền (T/T):** {tt_fee:,.2f} USD")
-            st.write(f"🔹 **Tín dụng thư (L/C):** {lc_fee:,.2f} USD")
-            
-            with st.expander("🎓 TẠI SAO L/C ĐẮT HƠN?"):
-                st.write("""
-                * **T/T (Chuyển tiền):** Ngân hàng chỉ đóng vai trò người chuyển tiền (Shipper tiền), không chịu trách nhiệm nếu người bán không giao hàng. -> Phí rẻ.
-                * **L/C (Tín dụng thư):** Ngân hàng dùng uy tín của mình để **cam kết thanh toán** thay cho người nhập khẩu. Ngân hàng chịu rủi ro tín dụng. -> Phí đắt (Bao gồm phí xử lý chứng từ và phí rủi ro).
-                """)
+        st.info("Tính phí giao dịch (Đã có sẵn logic cũ)")
+        val = st.number_input("Giá trị HĐ (USD):", value=100000)
+        st.write(f"Phí L/C ước tính: {val * 0.01 + 100:,.2f} USD")
 
     with tab_check:
         c1, c2 = st.columns(2)
         with c1: 
-            ship_last = st.date_input("Latest Shipment Date (Hạn giao hàng):")
-            lc_exp = st.date_input("L/C Expiry Date (Hạn L/C):")
+            ship_last = st.date_input("Hạn giao hàng:", value=pd.to_datetime("2025-01-01"))
+            lc_exp = st.date_input("Hạn L/C:", value=pd.to_datetime("2025-02-15"))
         with c2:
-            bl_date = st.date_input("B/L Date (Ngày vận đơn):")
-            pres_date = st.date_input("Presentation Date (Ngày xuất trình):")
+            bl_date = st.date_input("Ngày vận đơn (B/L):", value=pd.to_datetime("2025-01-05"))
+            pres_date = st.date_input("Ngày xuất trình:", value=pd.to_datetime("2025-02-01"))
             
-        if st.button("KIỂM TRA CHỨNG TỪ"):
-            errs = []
-            if bl_date > ship_last: errs.append("❌ Late Shipment (Giao hàng trễ hơn quy định)")
-            if pres_date > lc_exp: errs.append("❌ L/C Expired (Xuất trình khi L/C đã hết hạn)")
-            if (pres_date - bl_date).days > 21: errs.append("❌ Stale Documents (Chứng từ quá hạn > 21 ngày)")
-            
-            if errs:
-                for e in errs: st.error(e)
-            else:
-                st.success("✅ Clean Documents (Bộ chứng từ hoàn hảo).")
+        errs = []
+        if bl_date > ship_last: errs.append("Late Shipment (Giao trễ)")
+        if pres_date > lc_exp: errs.append("L/C Expired (L/C hết hạn)")
+        if (pres_date - bl_date).days > 21: errs.append("Stale Documents (Chứng từ quá hạn 21 ngày)")
         
-        with st.expander("🎓 QUY TẮC UCP 600"):
-             st.markdown("""
-             **Điều 14c UCP 600:**
-             Một bộ chứng từ phải được xuất trình không muộn hơn **21 ngày** theo lịch sau ngày giao hàng (Date of Shipment), nhưng trong bất kỳ trường hợp nào cũng không được muộn hơn ngày hết hạn hiệu lực của L/C.
-             """)
+        if st.button("KIỂM TRA CHỨNG TỪ"):
+            if errs:
+                for e in errs: st.error(f"❌ {e}")
+            else:
+                st.success("✅ Bộ chứng từ hợp lệ (Clean Docs)")
+
+        # --- AI INTEGRATION ROOM 3 ---
+        st.markdown("---")
+        if st.button("🤖 AI LEGAL: TƯ VẤN LUẬT UCP 600"):
+            if not api_key:
+                st.warning("⚠️ Cần API Key.")
+            else:
+                if not errs:
+                    context = "Bộ chứng từ sạch, không có lỗi."
+                else:
+                    context = f"Bộ chứng từ mắc các lỗi sau: {', '.join(errs)}."
+                
+                with st.spinner("Luật sư đang tra cứu UCP 600..."):
+                    advice = ask_gemini_generic("Legal Advisor (UCP 600 Expert)", context, "ucp600_advice")
+                    st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN PHÁP LÝ (UCP 600)</h4>{advice}</div>', unsafe_allow_html=True)
 
 # ==============================================================================
 # PHÒNG 4: INVESTMENT DEPT
@@ -369,55 +389,53 @@ elif "4." in room:
     
     st.markdown("""
     <div class="role-card">
-        <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư (Investment Analyst)</div>
-        <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI bằng mô hình DCF, có tính đến sự trượt giá của đồng nội tệ (Currency Depreciation)."</div>
+        <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư</div>
+        <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI bằng mô hình DCF, tính đến sự trượt giá của đồng nội tệ."</div>
     </div>
     """, unsafe_allow_html=True)
     
     c1, c2 = st.columns(2)
     with c1:
-        inv = st.number_input("Vốn đầu tư ban đầu (USD):", value=1000000)
+        inv = st.number_input("Vốn đầu tư (USD):", value=1000000)
         cf = st.number_input("Dòng tiền ròng/năm (USD):", value=400000)
-        years = st.slider("Vòng đời dự án (năm):", 1, 10, 3)
+        years = st.slider("Số năm:", 1, 10, 3)
     with c2:
-        fx = st.number_input("Tỷ giá Spot hiện tại:", value=25000.0)
-        depre = st.number_input("Mức độ mất giá VND (%/năm):", value=3.0)
-        wacc = st.number_input("Chi phí vốn (WACC %):", value=12.0)
+        fx = st.number_input("Tỷ giá Spot:", value=25000.0)
+        depre = st.number_input("Mức mất giá VND (%/năm):", value=3.0)
+        wacc = st.number_input("WACC (%):", value=12.0)
         
-    if st.button("📊 LẬP BẢNG DÒNG TIỀN (CF)"):
-        st.subheader("Bảng chiết khấu dòng tiền chi tiết:")
-        data = []
+    if st.button("📊 TÍNH TOÁN NPV"):
         total_pv = 0
-        
-        # Năm 0
         cf0_vnd = -inv * fx
-        data.append(["Năm 0", fx, f"{-inv:,.0f}", f"{cf0_vnd:,.0f}", f"{cf0_vnd:,.0f}"])
         
-        # Vòng lặp tính toán
+        # Logic tính NPV
         for i in range(1, years + 1):
-            fx_future = fx * ((1 + depre/100) ** i) # Tỷ giá tương lai
-            cf_vnd = cf * fx_future                 # Quy đổi ra VND
-            pv = cf_vnd / ((1 + wacc/100) ** i)     # Chiết khấu về hiện tại
+            fx_future = fx * ((1 + depre/100) ** i)
+            cf_vnd = cf * fx_future
+            pv = cf_vnd / ((1 + wacc/100) ** i)
             total_pv += pv
-            data.append([f"Năm {i}", f"{fx_future:,.0f}", f"{cf:,.0f}", f"{cf_vnd:,.0f}", f"{pv:,.0f}"])
             
         npv = total_pv + cf0_vnd
+        st.markdown(f"### 🏁 NPV DỰ ÁN: {npv:,.0f} VND")
         
-        df_cf = pd.DataFrame(data, columns=["Năm", "Tỷ giá (Dự báo)", "CF (USD)", "CF Quy đổi (VND)", "PV (Hiện giá)"])
-        st.table(df_cf)
-        
-        st.markdown(f"### 🏁 KẾT QUẢ NPV: {npv:,.0f} VND")
-        
-        with st.expander("🎓 GIẢI THÍCH MÔ HÌNH NPV QUỐC TẾ"):
-            st.latex(r"NPV = CF_0 + \sum_{t=1}^{n} \frac{CF_{USD, t} \times S_t}{(1 + WACC)^t}")
-            st.write("""
-            Khác với NPV thông thường, dự án quốc tế chịu tác động kép:
-            1.  **Dòng tiền kinh doanh:** (CF USD)
-            2.  **Rủi ro tỷ giá:** ($S_t$) - Nếu VND mất giá, doanh thu quy đổi sẽ tăng (lợi cho xuất khẩu/đầu tư mang ngoại tệ về), nhưng chi phí vốn cũng thay đổi.
-            """)
+        if npv > 0:
+            st.success("Dự án khả thi về mặt tài chính.")
+        else:
+            st.error("Dự án không khả thi.")
+
+    # --- AI INTEGRATION ROOM 4 ---
+    st.markdown("---")
+    if st.button("🤖 AI ANALYST: PHÂN TÍCH SWOT & VĨ MÔ"):
+        if not api_key:
+            st.warning("⚠️ Cần API Key.")
+        else:
+            context = f"Vốn {inv}$. Dòng tiền {cf}$/năm. Mất giá nội tệ dự báo: {depre}%/năm. WACC: {wacc}%."
+            with st.spinner("Chuyên gia đang đánh giá rủi ro phi tài chính..."):
+                advice = ask_gemini_generic("Strategic Analyst", context, "fdi_swot")
+                st.markdown(f'<div class="ai-box"><h4>🤖 PHÂN TÍCH CHIẾN LƯỢC</h4>{advice}</div>', unsafe_allow_html=True)
 
 # ==============================================================================
-# PHÒNG 5: MACRO STRATEGY (CÓ TÍCH HỢP AI)
+# PHÒNG 5: MACRO STRATEGY
 # ==============================================================================
 elif "5." in room:
     st.markdown('<p class="header-style">📉 Ban Chiến lược Vĩ mô (Macro Strategy)</p>', unsafe_allow_html=True)
@@ -425,53 +443,31 @@ elif "5." in room:
     st.markdown("""
     <div class="role-card">
         <div class="role-title">👤 Vai diễn: Cố vấn Kinh tế Chính phủ</div>
-        <div class="mission-text">"Nhiệm vụ: Đánh giá tác động của cú sốc tỷ giá lên nợ công quốc gia (Currency Mismatch) và đề xuất chính sách ứng phó."</div>
+        <div class="mission-text">"Nhiệm vụ: Đánh giá tác động của cú sốc tỷ giá lên nợ công và đề xuất chính sách."</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Input
     debt = st.number_input("Tổng nợ nước ngoài (Tỷ USD):", value=50.0)
     base_rate = 25000
-    shock = st.slider("Kịch bản: Đồng nội tệ mất giá (%):", 0, 50, 10)
+    shock = st.slider("Mức độ mất giá nội tệ (%):", 0, 50, 10)
     
-    # Calculation (Chạy Real-time khi kéo slider)
     new_rate = base_rate * (1 + shock/100)
     debt_old = debt * base_rate
     debt_new = debt * new_rate
     diff = debt_new - debt_old
     
-    # Hiển thị kết quả tính toán
     c1, c2, c3 = st.columns(3)
-    c1.metric("Tỷ giá sau cú sốc", f"{new_rate:,.0f}", f"+{shock}%")
+    c1.metric("Tỷ giá mới", f"{new_rate:,.0f}")
     c2.metric("Nợ công quy đổi", f"{debt_new:,.0f} Tỷ VND")
     c3.metric("Gánh nặng tăng thêm", f"{diff:,.0f} Tỷ VND", delta_color="inverse")
     
     st.markdown("---")
-    
-    # Nút bấm gọi AI (On-demand)
-    col_ai_btn, col_ai_space = st.columns([1, 2])
-    with col_ai_btn:
-        run_ai = st.button("🤖 YÊU CẦU CHUYÊN GIA AI PHÂN TÍCH", type="primary", use_container_width=True)
-    
-    if run_ai:
+    if st.button("🤖 YÊU CẦU CỐ VẤN AI SOẠN BÁO CÁO", type="primary"):
         if not api_key:
-            st.warning("⚠️ Chưa tìm thấy API Key. Vui lòng thêm Key vào 'Streamlit Secrets' để dùng tính năng AI.")
+            st.warning("⚠️ Cần API Key.")
         else:
-            with st.spinner("⏳ Chuyên gia AI đang soạn thảo báo cáo chính sách..."):
-                report = ask_gemini_macro(diff, shock, new_rate)
-                
-                # Hiển thị kết quả trong box đẹp (Màu chữ đã fix đen)
-                st.markdown(f"""
-                <div class="ai-box">
-                    <h4>📜 BÁO CÁO CỦA CỐ VẤN KINH TẾ (AI)</h4>
-                    <p>{report}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-    with st.expander("🎓 BÀI HỌC VĨ MÔ: CURRENCY MISMATCH"):
-        st.markdown("""
-        **Bất tương xứng tiền tệ (Currency Mismatch):**
-        * Đây là nguyên nhân chính dẫn đến khủng hoảng tài chính châu Á 1997.
-        * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
-        * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
-        """)
+            context = f"Tỷ giá tăng {shock}%. Nợ công tăng thêm {diff:,.0f} Tỷ VND."
+            with st.spinner("Đang soạn thảo báo cáo..."):
+                # Gọi hàm generic với type macro_shock
+                report = ask_gemini_generic("Economic Advisor", context, "macro_shock")
+                st.markdown(f'<div class="ai-box"><h4>📜 BÁO CÁO CỦA CỐ VẤN KINH TẾ</h4>{report}</div>', unsafe_allow_html=True)

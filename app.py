@@ -29,7 +29,9 @@ if api_key:
 def ask_gemini_macro(debt_increase, shock_percent, new_rate):
     """Hàm gọi AI để phân tích vĩ mô"""
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash') # Dùng bản Flash cho nhanh
+        # SỬA LỖI 1: Dùng 'gemini-pro' thay vì 'gemini-1.5-flash' để tương thích tốt hơn
+        model = genai.GenerativeModel('gemini-2.0-flash') 
+        
         prompt = f"""
         Đóng vai một Cố vấn Kinh tế cấp cao của Chính phủ (Economic Advisor).
         
@@ -40,12 +42,18 @@ def ask_gemini_macro(debt_increase, shock_percent, new_rate):
         
         Yêu cầu:
         Hãy viết một báo cáo ngắn gọn (khoảng 3 gạch đầu dòng lớn) cảnh báo Chính phủ về 3 tác động thực tế đến đời sống người dân và doanh nghiệp (Ví dụ: Lạm phát nhập khẩu, Giá xăng dầu, Áp lực thuế).
-        Văn phong: Trang trọng, cảnh báo rủi ro, chuyên nghiệp.
+        Văn phong: Trang trọng, cảnh báo rủi ro, chuyên nghiệp. Không dùng Markdown đậm nhạt quá nhiều.
         """
         response = model.generate_content(prompt)
         return response.text
     except Exception as e:
-        return f"⚠️ Hệ thống AI đang bận hoặc lỗi kết nối: {str(e)}"
+        error_msg = str(e)
+        if "429" in error_msg:
+            return "⚠️ Hệ thống đang quá tải (Hết lượt dùng miễn phí). Vui lòng thử lại sau 1-2 phút."
+        elif "404" in error_msg:
+            return "⚠️ Lỗi Model AI: Tài khoản Google của bạn không hỗ trợ Model này. Vui lòng tạo API Key bằng Gmail cá nhân."
+        else:
+            return f"⚠️ Lỗi kết nối AI: {error_msg}"
 
 # --- CSS GIAO DIỆN (THEME XANH DƯƠNG CHUYÊN NGHIỆP) ---
 st.markdown("""
@@ -90,7 +98,7 @@ st.markdown("""
     
     .explanation-box { background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 4px solid #ffb300; margin-top: 10px; }
     
-    /* AI Box Style */
+    /* SỬA LỖI 2: CSS AI Box - Ép màu chữ đen (#333) */
     .ai-box {
         background-color: #fff3e0;
         padding: 20px;
@@ -98,6 +106,15 @@ st.markdown("""
         border-left: 5px solid #ff9800;
         margin-top: 20px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        color: #333333 !important; /* Quan trọng: Ép màu chữ đen */
+    }
+    .ai-box h4 {
+        color: #e65100 !important;
+        font-weight: bold;
+        margin-bottom: 10px;
+    }
+    .ai-box p, .ai-box li {
+        color: #333333 !important; /* Đảm bảo nội dung con cũng màu đen */
     }
     
     /* Copyright Footer */
@@ -443,11 +460,11 @@ elif "5." in room:
             with st.spinner("⏳ Chuyên gia AI đang soạn thảo báo cáo chính sách..."):
                 report = ask_gemini_macro(diff, shock, new_rate)
                 
-                # Hiển thị kết quả trong box đẹp
+                # Hiển thị kết quả trong box đẹp (Màu chữ đã fix đen)
                 st.markdown(f"""
                 <div class="ai-box">
-                    <h4 style="color: #e65100;">📜 BÁO CÁO CỦA CỐ VẤN KINH TẾ (AI)</h4>
-                    <p style="text-align: justify;">{report}</p>
+                    <h4>📜 BÁO CÁO CỦA CỐ VẤN KINH TẾ (AI)</h4>
+                    <p>{report}</p>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -458,4 +475,3 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
-

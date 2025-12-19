@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import google.generativeai as genai
+import os
 
 # --- CẤU HÌNH TRANG ---
 st.set_page_config(
@@ -9,6 +11,41 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     page_icon="🏦"
 )
+
+# --- CẤU HÌNH API GEMINI (TỰ ĐỘNG LẤY TỪ SECRETS) ---
+api_key = None
+try:
+    # Ưu tiên lấy từ Secrets (trên Cloud)
+    api_key = st.secrets["GEMINI_API_KEY"]
+except (FileNotFoundError, KeyError):
+    # Fallback cho trường hợp chạy local mà chưa setup secrets
+    api_key = os.getenv("GEMINI_API_KEY")
+
+# Chỉ cấu hình nếu tìm thấy Key
+if api_key:
+    genai.configure(api_key=api_key)
+
+# Hàm gọi AI (Được cache để tối ưu)
+def ask_gemini_macro(debt_increase, shock_percent, new_rate):
+    """Hàm gọi AI để phân tích vĩ mô"""
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash') # Dùng bản Flash cho nhanh
+        prompt = f"""
+        Đóng vai một Cố vấn Kinh tế cấp cao của Chính phủ (Economic Advisor).
+        
+        Tình huống hiện tại:
+        - Đồng nội tệ vừa mất giá: {shock_percent}%
+        - Tỷ giá mới: {new_rate:,.0f} VND/USD
+        - Hậu quả tài khóa: Gánh nặng nợ công quốc gia vừa tăng thêm {debt_increase:,.0f} Tỷ VND do chênh lệch tỷ giá.
+        
+        Yêu cầu:
+        Hãy viết một báo cáo ngắn gọn (khoảng 3 gạch đầu dòng lớn) cảnh báo Chính phủ về 3 tác động thực tế đến đời sống người dân và doanh nghiệp (Ví dụ: Lạm phát nhập khẩu, Giá xăng dầu, Áp lực thuế).
+        Văn phong: Trang trọng, cảnh báo rủi ro, chuyên nghiệp.
+        """
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"⚠️ Hệ thống AI đang bận hoặc lỗi kết nối: {str(e)}"
 
 # --- CSS GIAO DIỆN (THEME XANH DƯƠNG CHUYÊN NGHIỆP) ---
 st.markdown("""
@@ -52,6 +89,16 @@ st.markdown("""
     }
     
     .explanation-box { background-color: #fff8e1; padding: 15px; border-radius: 5px; border-left: 4px solid #ffb300; margin-top: 10px; }
+    
+    /* AI Box Style */
+    .ai-box {
+        background-color: #fff3e0;
+        padding: 20px;
+        border-radius: 10px;
+        border-left: 5px solid #ff9800;
+        margin-top: 20px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
     
     /* Copyright Footer */
     .copyright {
@@ -353,7 +400,7 @@ elif "4." in room:
             """)
 
 # ==============================================================================
-# PHÒNG 5: MACRO STRATEGY
+# PHÒNG 5: MACRO STRATEGY (CÓ TÍCH HỢP AI)
 # ==============================================================================
 elif "5." in room:
     st.markdown('<p class="header-style">📉 Ban Chiến lược Vĩ mô (Macro Strategy)</p>', unsafe_allow_html=True)
@@ -361,24 +408,49 @@ elif "5." in room:
     st.markdown("""
     <div class="role-card">
         <div class="role-title">👤 Vai diễn: Cố vấn Kinh tế Chính phủ</div>
-        <div class="mission-text">"Nhiệm vụ: Đánh giá tác động của cú sốc tỷ giá lên nợ công quốc gia (Currency Mismatch)."</div>
+        <div class="mission-text">"Nhiệm vụ: Đánh giá tác động của cú sốc tỷ giá lên nợ công quốc gia (Currency Mismatch) và đề xuất chính sách ứng phó."</div>
     </div>
     """, unsafe_allow_html=True)
     
+    # Input
     debt = st.number_input("Tổng nợ nước ngoài (Tỷ USD):", value=50.0)
     base_rate = 25000
     shock = st.slider("Kịch bản: Đồng nội tệ mất giá (%):", 0, 50, 10)
     
+    # Calculation (Chạy Real-time khi kéo slider)
     new_rate = base_rate * (1 + shock/100)
     debt_old = debt * base_rate
     debt_new = debt * new_rate
     diff = debt_new - debt_old
     
+    # Hiển thị kết quả tính toán
     c1, c2, c3 = st.columns(3)
     c1.metric("Tỷ giá sau cú sốc", f"{new_rate:,.0f}", f"+{shock}%")
     c2.metric("Nợ công quy đổi", f"{debt_new:,.0f} Tỷ VND")
     c3.metric("Gánh nặng tăng thêm", f"{diff:,.0f} Tỷ VND", delta_color="inverse")
     
+    st.markdown("---")
+    
+    # Nút bấm gọi AI (On-demand)
+    col_ai_btn, col_ai_space = st.columns([1, 2])
+    with col_ai_btn:
+        run_ai = st.button("🤖 YÊU CẦU CHUYÊN GIA AI PHÂN TÍCH", type="primary", use_container_width=True)
+    
+    if run_ai:
+        if not api_key:
+            st.warning("⚠️ Chưa tìm thấy API Key. Vui lòng thêm Key vào 'Streamlit Secrets' để dùng tính năng AI.")
+        else:
+            with st.spinner("⏳ Chuyên gia AI đang soạn thảo báo cáo chính sách..."):
+                report = ask_gemini_macro(diff, shock, new_rate)
+                
+                # Hiển thị kết quả trong box đẹp
+                st.markdown(f"""
+                <div class="ai-box">
+                    <h4 style="color: #e65100;">📜 BÁO CÁO CỦA CỐ VẤN KINH TẾ (AI)</h4>
+                    <p style="text-align: justify;">{report}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
     with st.expander("🎓 BÀI HỌC VĨ MÔ: CURRENCY MISMATCH"):
         st.markdown("""
         **Bất tương xứng tiền tệ (Currency Mismatch):**
@@ -386,4 +458,3 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
-

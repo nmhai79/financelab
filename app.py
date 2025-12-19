@@ -139,14 +139,18 @@ st.markdown("""
         color: #333333 !important; /* Đảm bảo nội dung con cũng màu đen */
     }
 
-    /* --- NÚT AI ĐỒNG BỘ (NỀN ĐỎ CHỮ TRẮNG) --- */
+    /* --- NÚT AI ĐỒNG BỘ (NỀN ĐỎ CHỮ TRẮNG - FIX ICON MÀU) --- */
     div[data-testid="stButton"] > button[kind="primary"] {
         background-color: #ff2b2b !important;
         color: white !important;
         border: none;
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         transition: all 0.3s ease;
+        
+        /* QUAN TRỌNG: Ép dùng Font Emoji màu sắc thay vì font đen trắng của Linux/Browser mặc định */
+        font-family: "Segoe UI Emoji", "Noto Color Emoji", "Apple Color Emoji", "Android Emoji", sans-serif !important;
     }
+    
     div[data-testid="stButton"] > button[kind="primary"]:hover {
         background-color: #d32f2f !important;
         box-shadow: 0 4px 8px rgba(0,0,0,0.3);
@@ -278,8 +282,8 @@ if "1." in room:
         
         # --- BỔ SUNG AI CHO PHÒNG 1 ---
         st.markdown("---")
-        # NÚT AI ĐỒNG BỘ: type="primary" -> CSS sẽ biến thành màu đỏ
-        if st.button("🤖 Hỏi AI Trader: Đánh giá rủi ro", type="primary"):
+        # Dùng tham số icon="🤖" để render ổn định hơn
+        if st.button("Hỏi AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
             if api_key:
                 # Tính toán lại giá trị để gửi cho AI
                 s1 = 1000000 / bank_b
@@ -363,8 +367,8 @@ elif "2." in room:
 
     # --- BỔ SUNG AI CHO PHÒNG 2 ---
     st.markdown("---")
-    # NÚT AI ĐỒNG BỘ
-    if st.button("🤖 Hỏi AI CFO: Phản biện chiến lược", type="primary"):
+    # Dùng tham số icon="🤖"
+    if st.button("Hỏi AI CFO: Phản biện chiến lược", type="primary", icon="🤖"):
         if api_key:
             context = f"""
             Dự báo Spot tương lai của user: {future_spot}.
@@ -442,8 +446,8 @@ elif "3." in room:
 
         # --- BỔ SUNG AI CHO PHÒNG 3 ---
         st.markdown("---")
-        # NÚT AI ĐỒNG BỘ
-        if st.button("🤖 Hỏi AI Luật sư: Tư vấn UCP 600", type="primary"):
+        # Dùng tham số icon="🤖"
+        if st.button("Hỏi AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖"):
             if api_key:
                 # Kiểm tra lại trạng thái để lấy dữ liệu mới nhất
                 curr_errs = []
@@ -517,8 +521,8 @@ elif "4." in room:
 
     # --- BỔ SUNG AI CHO PHÒNG 4 ---
     st.markdown("---")
-    # NÚT AI ĐỒNG BỘ
-    if st.button("🤖 Hỏi AI Chiến lược: Phân tích vĩ mô", type="primary"):
+    # Dùng tham số icon="🤖"
+    if st.button("Hỏi AI Chiến lược: Phân tích vĩ mô", type="primary", icon="🤖"):
         if api_key:
             context = f"Vốn: {inv}$. Dòng tiền: {cf}$/năm. Mất giá nội tệ: {depre}%/năm. WACC: {wacc}%."
             task = "Phân tích SWOT nhanh về dự án này. Ngoài tài chính, nhà đầu tư cần lo ngại gì về vĩ mô (Lạm phát, chính trị, chuyển lợi nhuận về nước)?"
@@ -564,8 +568,8 @@ elif "5." in room:
     # Nút bấm gọi AI (On-demand)
     col_ai_btn, col_ai_space = st.columns([1, 2])
     with col_ai_btn:
-        # NÚT AI ĐỒNG BỘ: Đổi văn phong chữ thường, giữ use_container_width
-        run_ai = st.button("🤖 Hỏi AI Cố vấn: Phân tích chính sách", type="primary", use_container_width=True)
+        # Dùng tham số icon="🤖", giữ use_container_width
+        run_ai = st.button("Hỏi AI Cố vấn: Phân tích chính sách", type="primary", use_container_width=True, icon="🤖")
     
     if run_ai:
         if not api_key:

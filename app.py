@@ -321,152 +321,164 @@ if "1." in room:
 
     with tab2:
         st.header("⚡ Săn Arbitrage (Kinh doanh chênh lệch giá)")
-        
-        # 1. Nhập vốn (Động)
-        capital = st.number_input("Vốn kinh doanh (USD):", value=1000000.0, step=10000.0, format="%.0f")
-        
-        st.markdown("---")
-        
-        # 2. Nhập tỷ giá các ngân hàng
-        k1, k2, k3 = st.columns(3)
-        with k1: bank_a = st.number_input("Bank A (USD/VND):", value=25000.0, help="Giá bán USD lấy VND")
-        with k2: bank_b = st.number_input("Bank B (EUR/USD):", value=1.1000, help="Giá bán EUR lấy USD")
-        with k3: bank_c = st.number_input("Bank C (EUR/VND):", value=28000.0, help="Giá bán EUR lấy VND")
-        
-        # --- TÍNH TOÁN LOGIC ---
-        # Tính tỷ giá cân bằng lý thuyết (No Arbitrage Rate) để làm gợi ý
-        fair_rate_c = bank_a * bank_b
+    
+    # 1. Nhập vốn (Động)
+    capital = st.number_input("Vốn kinh doanh (USD):", value=1000000.0, step=10000.0, format="%.0f")
+    
+    st.markdown("---")
+    
+    # 2. Nhập tỷ giá các ngân hàng
+    k1, k2, k3 = st.columns(3)
+    with k1: bank_a = st.number_input("Bank A (USD/VND):", value=25000.0, help="Giá bán USD lấy VND")
+    with k2: bank_b = st.number_input("Bank B (EUR/USD):", value=1.1000, help="Giá bán EUR lấy USD")
+    with k3: bank_c = st.number_input("Bank C (EUR/VND):", value=28000.0, help="Giá bán EUR lấy VND")
+    
+    # --- TÍNH TOÁN LOGIC ---
+    # Tính tỷ giá cân bằng lý thuyết (No Arbitrage Rate) để làm gợi ý
+    fair_rate_c = bank_a * bank_b
 
-        # Cách 1: USD -> EUR -> VND -> USD
-        path1_eur = capital / bank_b
-        path1_vnd = path1_eur * bank_c
-        path1_usd_final = path1_vnd / bank_a
-        profit1 = path1_usd_final - capital
-        
-        # Cách 2: USD -> VND -> EUR -> USD
-        path2_vnd = capital * bank_a
-        path2_eur = path2_vnd / bank_c
-        path2_usd_final = path2_eur * bank_b
-        profit2 = path2_usd_final - capital
+    # Cách 1: USD -> EUR -> VND -> USD
+    path1_eur = capital / bank_b
+    path1_vnd = path1_eur * bank_c
+    path1_usd_final = path1_vnd / bank_a
+    profit1 = path1_usd_final - capital
+    
+    # Cách 2: USD -> VND -> EUR -> USD
+    path2_vnd = capital * bank_a
+    path2_eur = path2_vnd / bank_c
+    path2_usd_final = path2_eur * bank_b
+    profit2 = path2_usd_final - capital
 
-        # --- NÚT CHẠY MÔ HÌNH HIỂN THỊ ---
-        if st.button("🚀 KÍCH HOẠT THUẬT TOÁN ARBITRAGE"):
-            st.markdown("### 📝 Nhật ký giao dịch tối ưu:")
+    # --- [FIX LỖI] XÁC ĐỊNH KẾT QUẢ TỐT NHẤT ĐỂ CHO VÀO BIẾN ---
+    # Đoạn này cần thiết để AI có dữ liệu đọc (biến best_direction chưa có ở code cũ)
+    if profit1 > profit2 and profit1 > 0:
+        best_direction = "Mua EUR (Bank B) ➔ Bán tại Bank C ➔ Đổi về Bank A"
+        best_profit = profit1
+    elif profit2 >= profit1 and profit2 > 0:
+        best_direction = "Đổi VND (Bank A) ➔ Mua EUR (Bank C) ➔ Bán tại Bank B"
+        best_profit = profit2
+    else:
+        best_direction = "Không có cơ hội (Thị trường cân bằng hoặc lỗ)"
+        best_profit = 0.0
+
+    # --- NÚT CHẠY MÔ HÌNH HIỂN THỊ ---
+    if st.button("🚀 KÍCH HOẠT THUẬT TOÁN ARBITRAGE"):
+        st.markdown("### 📝 Nhật ký giao dịch tối ưu:")
+        
+        if profit1 > 1.0: # Dùng > 1.0 để tránh lỗi làm tròn số cực nhỏ
+            # Hiển thị Cách 1: B -> C -> A
+            st.success(f"✅ PHÁT HIỆN CƠ HỘI: Mua EUR (Bank B) ➔ Bán tại Bank C ➔ Đổi về Bank A")
             
-            if profit1 > 1.0: # Dùng > 1.0 để tránh lỗi làm tròn số cực nhỏ
-                # Hiển thị Cách 1: B -> C -> A
-                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Mua EUR (Bank B) ➔ Bán tại Bank C ➔ Đổi về Bank A")
-                
-                st.markdown(f"""
-                <div class="step-box">
-                1. <b>Dùng USD mua EUR (tại Bank B):</b><br>
-                   {capital:,.0f} / {bank_b} = <b>{path1_eur:,.2f} EUR</b><br><br>
-                2. <b>Bán EUR đổi lấy VND (tại Bank C):</b><br>
-                   {path1_eur:,.2f} × {bank_c} = <b>{path1_vnd:,.0f} VND</b> (Giá EUR ở C đang cao)<br><br>
-                3. <b>Đổi VND về lại USD (tại Bank A):</b><br>
-                   {path1_vnd:,.0f} / {bank_a} = <b>{path1_usd_final:,.2f} USD</b>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit1:,.2f} USD</div>', unsafe_allow_html=True)
-                
-                # [GỢI Ý]
-                st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
+            st.markdown(f"""
+            <div class="step-box">
+            1. <b>Dùng USD mua EUR (tại Bank B):</b><br>
+                {capital:,.0f} / {bank_b} = <b>{path1_eur:,.2f} EUR</b><br><br>
+            2. <b>Bán EUR đổi lấy VND (tại Bank C):</b><br>
+                {path1_eur:,.2f} × {bank_c} = <b>{path1_vnd:,.0f} VND</b> (Giá EUR ở C đang cao)<br><br>
+            3. <b>Đổi VND về lại USD (tại Bank A):</b><br>
+                {path1_vnd:,.0f} / {bank_a} = <b>{path1_usd_final:,.2f} USD</b>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit1:,.2f} USD</div>', unsafe_allow_html=True)
+            
+            # [GỢI Ý]
+            st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
 
-            elif profit2 > 1.0:
-                # Hiển thị Cách 2: A -> C -> B
-                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Đổi VND (Bank A) ➔ Mua EUR (Bank C) ➔ Bán tại Bank B")
-                
-                st.markdown(f"""
-                <div class="step-box">
-                1. <b>Đổi USD sang VND (tại Bank A):</b><br>
-                   {capital:,.0f} × {bank_a} = <b>{path2_vnd:,.0f} VND</b><br><br>
-                2. <b>Dùng VND mua EUR (tại Bank C):</b><br>
-                   {path2_vnd:,.0f} / {bank_c} = <b>{path2_eur:,.2f} EUR</b> (Giá EUR ở C đang rẻ)<br><br>
-                3. <b>Bán EUR đổi về USD (tại Bank B):</b><br>
-                   {path2_eur:,.2f} × {bank_b} = <b>{path2_usd_final:,.2f} USD</b>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit2:,.2f} USD</div>', unsafe_allow_html=True)
-                
-                # [GỢI Ý]
-                st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
-                
-            else:
-                st.balloons()
-                st.warning("⚖️ Thị trường cân bằng (No Arbitrage). Cả 2 chiều giao dịch đều không sinh lời.")
-                # Khi đã cân bằng thì hiện thông báo khen ngợi
-                st.success(f"👏 Xuất sắc! Bạn đã tìm ra tỷ giá cân bằng: {bank_c:,.0f} ≈ {bank_a} × {bank_b}")
+        elif profit2 > 1.0:
+            # Hiển thị Cách 2: A -> C -> B
+            st.success(f"✅ PHÁT HIỆN CƠ HỘI: Đổi VND (Bank A) ➔ Mua EUR (Bank C) ➔ Bán tại Bank B")
+            
+            st.markdown(f"""
+            <div class="step-box">
+            1. <b>Đổi USD sang VND (tại Bank A):</b><br>
+                {capital:,.0f} × {bank_a} = <b>{path2_vnd:,.0f} VND</b><br><br>
+            2. <b>Dùng VND mua EUR (tại Bank C):</b><br>
+                {path2_vnd:,.0f} / {bank_c} = <b>{path2_eur:,.2f} EUR</b> (Giá EUR ở C đang rẻ)<br><br>
+            3. <b>Bán EUR đổi về USD (tại Bank B):</b><br>
+                {path2_eur:,.2f} × {bank_b} = <b>{path2_usd_final:,.2f} USD</b>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit2:,.2f} USD</div>', unsafe_allow_html=True)
+            
+            # [GỢI Ý]
+            st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
+            
+        else:
+            st.balloons()
+            st.warning("⚖️ Thị trường cân bằng (No Arbitrage). Cả 2 chiều giao dịch đều không sinh lời.")
+            # Khi đã cân bằng thì hiện thông báo khen ngợi
+            st.success(f"👏 Xuất sắc! Bạn đã tìm ra tỷ giá cân bằng: {bank_c:,.0f} ≈ {bank_a} × {bank_b}")
 
-            # Giải thích chung
-            with st.expander("🎓 BẢN CHẤT: Tại sao có tiền lời?"):
-                st.markdown("""
-                **Nguyên lý:** Arbitrage tam giác (Triangular Arbitrage).
-                
-                Máy tính đã tự động so sánh hai con đường vòng quanh 3 ngân hàng:
-                * **Vòng 1 (Chiều xuôi):** USD ➔ EUR (Bank B) ➔ VND (Bank C) ➔ USD (Bank A).
-                * **Vòng 2 (Chiều ngược):** USD ➔ VND (Bank A) ➔ EUR (Bank C) ➔ USD (Bank B).
-                
-                Nếu chênh lệch giá đủ lớn, dòng tiền đi một vòng sẽ "đẻ" ra tiền lời.
-                """)
-                st.write("")          
-        
-        # --- [MỚI] THÊM DÒNG NÀY ĐỂ TẠO KHUNG BAO QUANH ---
-        with st.container(border=True):
-        # MINH HỌA BẰNG SƠ ĐỒ GRAPHVIZ
-            st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
+        # Giải thích chung
+        with st.expander("🎓 BẢN CHẤT: Tại sao có tiền lời?"):
+            st.markdown("""
+            **Nguyên lý:** Arbitrage tam giác (Triangular Arbitrage).
+            
+            Máy tính đã tự động so sánh hai con đường vòng quanh 3 ngân hàng:
+            * **Vòng 1 (Chiều xuôi):** USD ➔ EUR (Bank B) ➔ VND (Bank C) ➔ USD (Bank A).
+            * **Vòng 2 (Chiều ngược):** USD ➔ VND (Bank A) ➔ EUR (Bank C) ➔ USD (Bank B).
+            
+            Nếu chênh lệch giá đủ lớn, dòng tiền đi một vòng sẽ "đẻ" ra tiền lời.
+            """)
+            st.write("")          
+    
+    # --- [MỚI] THÊM DÒNG NÀY ĐỂ TẠO KHUNG BAO QUANH ---
+    with st.container(border=True):
+    # MINH HỌA BẰNG SƠ ĐỒ GRAPHVIZ
+        st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
 
-            # Tạo sơ đồ
-            st.graphviz_chart('''
-                digraph {
-                    # Thiết lập hướng từ Trái sang Phải (Left to Right)
-                    rankdir=LR; 
-                    node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
-                    edge [color="#555555", fontname="Arial", fontsize=10];
+        # Tạo sơ đồ
+        st.graphviz_chart('''
+            digraph {
+                # Thiết lập hướng từ Trái sang Phải (Left to Right)
+                rankdir=LR; 
+                node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
+                edge [color="#555555", fontname="Arial", fontsize=10];
 
-                    # Định nghĩa các nút (Nodes)
-                    MarketA [label="📉 Thị trường A\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
-                    MarketB [label="📈 Thị trường B\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
-                    Wallet [label="💰 TÚI TIỀN\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
+                # Định nghĩa các nút (Nodes)
+                MarketA [label="📉 Thị trường A\\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
+                MarketB [label="📈 Thị trường B\\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
+                Wallet [label="💰 TÚI TIỀN\\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
 
-                    # Định nghĩa các đường đi (Edges)
-                    MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
-                    MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
-                    
-                    # Đường ẩn để căn chỉnh (nếu cần)
-                }
-            ''', use_container_width=True)
+                # Định nghĩa các đường đi (Edges)
+                MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
+                MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
+                
+                # Đường ẩn để căn chỉnh (nếu cần)
+            }
+        ''', use_container_width=True)
 
-            st.info("💡 **Dễ hiểu hơn:** Bạn giống như một người buôn chuyến, mua hàng ở chợ sỉ (giá rẻ) và mang ra chợ lẻ (giá cao) để bán ngay lập tức.")
-                
-        # --- BỔ SUNG AI CHO PHÒNG 1 (ĐÃ SỬA LỖI LOGIC ĐỘNG) ---
-        st.markdown("---")
-        
-        if st.button("AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
-            if api_key:
-                # Context ĐỘNG: Lấy đúng số vốn và lợi nhuận vừa tính ở trên
-                context = f"""
-                Tình huống: Giao dịch Arbitrage Tỷ giá (Triangular Arbitrage).
-                - Số vốn đầu tư: {capital:,.0f} USD.
-                - Tỷ giá thị trường: Bank A (USD/VND)={bank_a}, Bank B (EUR/USD)={bank_b}, Bank C (EUR/VND)={bank_c}.
-                - Kết quả tính toán tốt nhất: {best_direction}.
-                - Lợi nhuận lý thuyết dự kiến: {best_profit:,.2f} USD.
-                """
-                
-                task = """
-                Đóng vai một Senior FX Trader tại ngân hàng đầu tư (Goldman Sachs/JP Morgan).
-                Hãy phân tích ngắn gọn:
-                1. Rủi ro thực tế khi thực hiện 3 lệnh liên tiếp là gì (Gợi ý: Độ trễ/Latency và Trượt giá/Slippage)?
-                2. Với mức lợi nhuận dự kiến trên, có đáng để mạo hiểm vào lệnh không? (So sánh với phí giao dịch transaction cost).
-                3. Đưa ra quyết định: GO (Vào lệnh) hay NO-GO (Hủy)?
-                """
-                
-                with st.spinner(f"AI đang phân tích cơ hội với vốn {capital:,.0f} USD..."):
-                    advise = ask_gemini_advisor("Senior FX Trader", context, task)
-                    st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise}</div>', unsafe_allow_html=True)
-            else:
-                st.warning("⚠️ Vui lòng nhập API Key.")
+        st.info("💡 **Dễ hiểu hơn:** Bạn giống như một người buôn chuyến, mua hàng ở chợ sỉ (giá rẻ) và mang ra chợ lẻ (giá cao) để bán ngay lập tức.")
+            
+    # --- BỔ SUNG AI CHO PHÒNG 1 (ĐÃ SỬA LỖI LOGIC ĐỘNG) ---
+    st.markdown("---")
+    
+    if st.button("AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
+        if api_key:
+            # Context ĐỘNG: Lấy đúng số vốn và lợi nhuận vừa tính ở trên
+            context = f"""
+            Tình huống: Giao dịch Arbitrage Tỷ giá (Triangular Arbitrage).
+            - Số vốn đầu tư: {capital:,.0f} USD.
+            - Tỷ giá thị trường: Bank A (USD/VND)={bank_a}, Bank B (EUR/USD)={bank_b}, Bank C (EUR/VND)={bank_c}.
+            - Kết quả tính toán tốt nhất: {best_direction}.
+            - Lợi nhuận lý thuyết dự kiến: {best_profit:,.2f} USD.
+            """
+            
+            task = """
+            Đóng vai một Senior FX Trader tại ngân hàng đầu tư (Goldman Sachs/JP Morgan).
+            Hãy phân tích ngắn gọn:
+            1. Rủi ro thực tế khi thực hiện 3 lệnh liên tiếp là gì (Gợi ý: Độ trễ/Latency và Trượt giá/Slippage)?
+            2. Với mức lợi nhuận dự kiến trên, có đáng để mạo hiểm vào lệnh không? (So sánh với phí giao dịch transaction cost).
+            3. Đưa ra quyết định: GO (Vào lệnh) hay NO-GO (Hủy)?
+            """
+            
+            with st.spinner(f"AI đang phân tích cơ hội với vốn {capital:,.0f} USD..."):
+                advise = ask_gemini_advisor("Senior FX Trader", context, task)
+                st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Vui lòng nhập API Key.")
         st.markdown("---")
         st.markdown(
             """
@@ -1168,18 +1180,15 @@ elif "3." in room:
     st.markdown("---")
     st.markdown('<div style="text-align: center; color: #888; font-size: 13px;">© 2026 Designed by Nguyễn Minh Hải</div>', unsafe_allow_html=True)
 # ==============================================================================
-# PHÒNG 4: ĐẦU TƯ QUỐC TẾ
-# ==============================================================================
-# ==============================================================================
-# PHÒNG 4: ĐẦU TƯ QUỐC TẾ (UPDATED WITH IRR & CONCLUSION)
+# PHÒNG 4: ĐẦU TƯ QUỐC TẾ (FIX LỖI NÚT AI + SESSION STATE)
 # ==============================================================================
 elif "4." in room:
-    # --- IMPORT THƯ VIỆN TÀI CHÍNH (Xử lý trường hợp chưa cài đặt) ---
+    # --- IMPORT THƯ VIỆN TÀI CHÍNH ---
     try:
         import numpy_financial as npf
     except ImportError:
         st.error("⚠️ Thư viện 'numpy_financial' chưa được cài đặt. Vui lòng chạy `pip install numpy-financial` để tính IRR.")
-        import numpy as npf # Fallback (có thể warning trên các bản numpy mới)
+        import numpy as npf 
 
     st.markdown('<p class="header-style">🏭 Phòng Đầu tư Quốc tế (Investment Dept)</p>', unsafe_allow_html=True)
     
@@ -1208,20 +1217,27 @@ elif "4." in room:
             
     st.markdown("---")
 
-    # --- 2. TÍNH TOÁN & HIỂN THỊ ---
+    # --- XỬ LÝ TRẠNG THÁI (SESSION STATE) ĐỂ GIỮ NÚT AI KHÔNG BIẾN MẤT ---
+    if "run_dcf" not in st.session_state:
+        st.session_state.run_dcf = False
+
+    # Nút kích hoạt tính toán
     if st.button("📊 CHẠY MÔ HÌNH DCF & PHÂN TÍCH ĐỘ NHẠY"):
+        st.session_state.run_dcf = True
+
+    # --- 2. TÍNH TOÁN & HIỂN THỊ (CHỈ CHẠY KHI ĐÃ KÍCH HOẠT) ---
+    if st.session_state.run_dcf:
         
         # A. TÍNH DÒNG TIỀN CƠ SỞ (BASE CASE)
-        # -----------------------------------
         data_cf = []
-        cf_stream_vnd_nominal = [] # Dòng tiền danh nghĩa (chưa chiết khấu) để tính IRR
+        cf_stream_vnd_nominal = [] # Dòng tiền danh nghĩa để tính IRR
         cumulative_pv = 0
         payback_period = None
         
         # Năm 0
         cf0_vnd = -inv * fx_spot
         cumulative_pv += cf0_vnd
-        cf_stream_vnd_nominal.append(cf0_vnd) # Thêm vào stream tính IRR
+        cf_stream_vnd_nominal.append(cf0_vnd)
         
         data_cf.append({
             "Năm": 0, 
@@ -1234,26 +1250,17 @@ elif "4." in room:
         
         # Năm 1 -> n
         for i in range(1, years + 1):
-            # Tính tỷ giá tương lai: S_t = S_0 * (1 + delta)^t
             fx_future = fx_spot * ((1 + depre/100) ** i)
-            
-            # Tính dòng tiền USD: Operating CF + Terminal Value (nếu là năm cuối)
             cf_usd = cf_yearly + (salvage_val if i == years else 0)
-            
-            # Quy đổi VND: CF_VND = CF_USD * S_t
             cf_vnd = cf_usd * fx_future
-            cf_stream_vnd_nominal.append(cf_vnd) # Thêm vào stream tính IRR
+            cf_stream_vnd_nominal.append(cf_vnd) 
             
-            # Chiết khấu: PV = CF_VND / (1 + WACC)^t
             pv_vnd = cf_vnd / ((1 + wacc/100) ** i)
             
-            # Lưu lại giá trị lũy kế cũ để tính Payback Period
             prev_cumulative = cumulative_pv
             cumulative_pv += pv_vnd
             
-            # Check thời gian hoàn vốn (Lần đầu tiên Lũy kế chuyển từ Âm sang Dương)
             if payback_period is None and cumulative_pv >= 0:
-                # Công thức nội suy: Năm trước + (Số tiền còn thiếu / Dòng tiền năm nay)
                 fraction = abs(prev_cumulative) / pv_vnd
                 payback_period = (i - 1) + fraction
             
@@ -1266,16 +1273,15 @@ elif "4." in room:
                 "Lũy kế PV": cumulative_pv
             })
             
-        npv = cumulative_pv # NPV chính là Lũy kế năm cuối cùng
+        npv = cumulative_pv 
         
-        # Tính IRR (Internal Rate of Return)
+        # Tính IRR
         try:
             irr_value = npf.irr(cf_stream_vnd_nominal) * 100
         except:
-            irr_value = 0 # Xử lý lỗi nếu dòng tiền không hội tụ
+            irr_value = 0 
         
         # B. HIỂN THỊ KẾT QUẢ
-        # -----------------------------------
         st.subheader("1. Kết quả Thẩm định")
         
         m1, m2, m3 = st.columns(3)
@@ -1287,21 +1293,18 @@ elif "4." in room:
         else:
             m2.metric("Thời gian hoàn vốn", "Chưa hoàn vốn", delta_color="inverse")
             
-        # [UPDATED] Hiển thị IRR thay vì ROI
         m3.metric("IRR (Hoàn vốn nội bộ)", f"{irr_value:.2f}%", 
                   help="Tỷ suất sinh lời thực tế. So sánh với WACC.",
-                  delta=f"WACC: {wacc}%", delta_color="normal") # Hiển thị WACC nhỏ bên dưới để so sánh
+                  delta=f"WACC: {wacc}%", delta_color="normal")
 
-        # --- [NEW] KẾT LUẬN TỰ ĐỘNG ---
-        # Logic: NPV > 0 VÀ IRR > WACC => Nên đầu tư
+        # KẾT LUẬN TỰ ĐỘNG
         is_feasible = (npv > 0) and (irr_value > wacc)
-        
         if is_feasible:
-            st.success(f"✅ KẾT LUẬN: NÊN ĐẦU TƯ. Dự án tạo ra lợi nhuận ròng dương ({npv:,.0f} VND) và Tỷ suất sinh lời ({irr_value:.2f}%) cao hơn chi phí vốn ({wacc}%).")
+            st.success(f"✅ KẾT LUẬN: NÊN ĐẦU TƯ. Dự án tạo ra lợi nhuận ròng dương ({npv:,.0f} VND) và IRR ({irr_value:.2f}%) cao hơn chi phí vốn.")
         else:
             reason = []
             if npv <= 0: reason.append("NPV âm")
-            if irr_value <= wacc: reason.append(f"IRR ({irr_value:.2f}%) thấp hơn lãi suất yêu cầu ({wacc}%)")
+            if irr_value <= wacc: reason.append(f"IRR ({irr_value:.2f}%) thấp hơn WACC")
             st.error(f"⛔ KẾT LUẬN: KHÔNG NÊN ĐẦU TƯ. Lý do: {', '.join(reason)}.")
 
         # Biểu đồ kết hợp
@@ -1311,100 +1314,56 @@ elif "4." in room:
         with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
             st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
 
-        # --- [UPDATED] C. GIẢI THÍCH CÔNG THỨC (EDUCATIONAL PART) ---
-        # --------------------------------------------------------
-        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC (READING MATERIAL)", expanded=True):
+        # C. GIẢI THÍCH CÔNG THỨC CHI TIẾT
+        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=True):
+            
+            # --- 1. NPV ---
             st.markdown("#### 1. Công thức tính NPV Điều chỉnh Tỷ giá")
-            st.markdown("Mô hình này khác NPV thông thường vì dòng tiền USD phải được quy đổi ra VND theo tỷ giá kỳ vọng từng năm trước khi chiết khấu.")
-                    
-                    # FIX: Dùng \text{WACC} để chữ hiển thị liền nhau đẹp hơn
+            st.markdown("Dòng tiền USD được quy đổi ra VND theo tỷ giá kỳ vọng từng năm trước khi chiết khấu.")
             st.latex(r"NPV = -I_0 \times S_0 + \sum_{t=1}^{n} \frac{(CF_{t, USD} + TV_n) \times S_t}{(1 + \text{WACC})^t}")
-                    
             st.markdown(f"""
-                    **Trong đó:**
-                    * $I_0$: Vốn đầu tư ban đầu ({inv:,.0f} USD).
-                    * $CF_{{t, USD}}$: Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
-                    * $TV_n$: Giá trị thanh lý năm cuối ({salvage_val:,.0f} USD).
-                    * $S_t$: Tỷ giá dự báo năm $t$, tính bằng: $S_0 \\times (1 + {depre}\%)^t$.
-                    * $\\text{{WACC}}$: Chi phí vốn ({wacc}%).
-                    """)
-                    
+            **Trong đó:**
+            * $I_0$: Vốn đầu tư ban đầu ({inv:,.0f} USD).
+            * $CF_{{t, USD}}$: Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
+            * $S_t$: Tỷ giá dự báo năm $t$, tính bằng: $S_0 \\times (1 + {depre}\%)^t$.
+            """)
+            
             st.divider()
-                    
-                    # --- 2. CÔNG THỨC DPP (ĐÃ SỬA LỖI TRUY XUẤT DỮ LIỆU) ---
+            
+            # --- 2. DPP ---
             st.markdown("#### 2. Công thức Thời gian hoàn vốn (DPP)")
-                    
-                    # A. Hiển thị công thức tổng quát
             st.latex(r"DPP = Y_{negative} + \frac{|PV_{Cumulative}|}{PV_{NextYear}}")
-                    
-                    # B. Giải thích các tham số (Legend)
-            st.markdown("""
-                    **Trong đó:**
-                    * $Y_{negative}$: Số năm mà dòng tiền lũy kế vẫn còn âm (Năm liền trước khi hoàn vốn).
-                    * $|PV_{Cumulative}|$: Số vốn "còn thiếu" tại cuối năm $Y_{negative}$ (Lấy trị tuyệt đối).
-                    * $PV_{NextYear}$: Dòng tiền (đã chiết khấu) thu được trong năm kế tiếp.
-                    """)
-
-                    # C. Ráp số liệu thực tế (Plug-in Values)
+            
             if payback_period:
-                        y_neg_idx = int(payback_period) # Ví dụ: 4
-                        
-                        try:
-                            # [FIX] Lấy dữ liệu từ mảng data_cf đã tính ở trên
-                            # data_cf là list of dicts, index 0 là năm 0, index 1 là năm 1...
-                            # Nên index trùng với số năm
-                            
-                            val_missing = abs(data_cf[y_neg_idx]["Lũy kế PV"]) # Số tiền còn thiếu (dương)
-                            val_next = data_cf[y_neg_idx + 1]["PV (Hiện giá VND)"] # Tiền kiếm được năm sau
-                            
-                            st.markdown("👇 **Áp dụng số liệu dự án:**")
-                            st.latex(f"DPP = {y_neg_idx} + \\frac{{|{val_missing:,.0f}|}}{{{val_next:,.0f}}} = \\mathbf{{{payback_period:.2f} \\text{{ Năm}}}}")
-                            
-                            st.info(f"""
-                            💡 **Diễn giải:** Dự án mất **{y_neg_idx} năm** chẵn để gần hòa vốn. 
-                            Tại cuối năm {y_neg_idx}, dự án vẫn còn thiếu **{val_missing:,.0f} VND**. 
-                            Sang năm {y_neg_idx + 1}, dự án kiếm được **{val_next:,.0f} VND**, đủ bù đắp phần thiếu đó.
-                            """)
-                        except Exception as e:
-                            # Fallback nếu index vượt quá giới hạn (ít gặp)
-                            st.warning(f"Đã tính được DPP ({payback_period:.2f} năm), nhưng không thể hiển thị chi tiết phép chia.")
-            else:
-                        st.info("Dự án chưa hoàn vốn nên không thể áp dụng công thức chi tiết.")
-
-            st.divider()
-
-            # --- [NEW] 3. CÔNG THỨC IRR ---
-            st.markdown("#### 3. Công thức Tỷ suất hoàn vốn nội bộ (IRR)")
-            st.markdown("""
-            **IRR (Internal Rate of Return)** là tỷ suất chiết khấu ($r$) mà tại đó **NPV = 0**. 
-            Nói cách khác, đó là mức lãi suất hòa vốn của dự án.
-            """)
-            st.latex(r"NPV = \sum_{t=0}^{n} \frac{CF_{t, VND}}{(1 + IRR)^t} = 0")
-            
-            st.markdown(f"""
-            **Quy tắc ra quyết định:**
-            * Nếu **IRR > WACC ({wacc}%)** $\\rightarrow$ Dự án sinh lời cao hơn lãi suất gửi ngân hàng/chi phí vay $\\rightarrow$ **Đầu tư**.
-            * Nếu **IRR < WACC ({wacc}%)** $\\rightarrow$ Dự án không hiệu quả bằng việc dùng vốn làm việc khác $\\rightarrow$ **Loại bỏ**.
-            
-            👉 Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.
-            """)
-
-            st.divider()
-                                # --- 3. PHÂN TÍCH ĐỘ NHẠY (GIỮ NGUYÊN) ---
-            st.markdown("#### 4. Tại sao cần Phân tích Độ nhạy (Sensitivity)?")
-            st.write("""
-                    Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. 
-                    Ma trận bên dưới (Sensitivity Matrix) giúp trả lời câu hỏi: 
-                    *"Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?"*
+                y_neg_idx = int(payback_period)
+                try:
+                    val_missing = abs(data_cf[y_neg_idx]["Lũy kế PV"])
+                    val_next = data_cf[y_neg_idx + 1]["PV (Hiện giá VND)"]
+                    
+                    st.markdown("👇 **Áp dụng số liệu dự án:**")
+                    st.latex(f"DPP = {y_neg_idx} + \\frac{{|{val_missing:,.0f}|}}{{{val_next:,.0f}}} = \\mathbf{{{payback_period:.2f} \\text{{ Năm}}}}")
+                    
+                    st.info(f"""
+                    💡 **Diễn giải:** * Sau **{y_neg_idx} năm**, dự án vẫn còn lỗ lũy kế **{val_missing:,.0f} VND**. 
+                    * Sang năm thứ **{y_neg_idx + 1}**, dự án kiếm được **{val_next:,.0f} VND**, đủ để bù phần lỗ đó.
                     """)
+                except Exception:
+                    st.warning("Đã hoàn vốn nhưng không hiển thị được chi tiết phép tính.")
+            else:
+                st.info("Dự án chưa hoàn vốn nên không thể áp dụng công thức chi tiết.")
 
+            st.divider()
 
-        # D. PHÂN TÍCH ĐỘ NHẠY (SENSITIVITY ANALYSIS)
-        # ------------------------------------------------------
+            # --- 3. IRR ---
+            st.markdown("#### 3. Công thức Tỷ suất hoàn vốn nội bộ (IRR)")
+            st.markdown("**IRR** là mức lãi suất mà tại đó **NPV = 0**.")
+            st.latex(r"NPV = \sum_{t=0}^{n} \frac{CF_{t, VND}}{(1 + IRR)^t} = 0")
+            st.markdown(f"👉 Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.")
+
+        # D. PHÂN TÍCH ĐỘ NHẠY
         st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
         st.markdown("Kiểm tra sức khỏe dự án khi **WACC** và **Mức mất giá VND** thay đổi.")
         
-        # Tạo ma trận biến thiên
         wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
         depre_range = [depre - 2, depre - 1, depre, depre + 1, depre + 2]
         
@@ -1412,7 +1371,6 @@ elif "4." in room:
         for w in wacc_range:
             row = []
             for d in depre_range:
-                # Tính nhanh NPV loop
                 sim_npv = -inv * fx_spot
                 for t in range(1, years + 1):
                     sim_fx = fx_spot * ((1 + d/100) ** t)
@@ -1433,29 +1391,24 @@ elif "4." in room:
 
         st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
         
-        # E. AI ADVISOR (UPDATED WITH IRR CONTEXT)
-        # -------------------------------
+        # E. AI ADVISOR (ĐÃ FIX LỖI BIẾN MẤT)
         st.markdown("---")
-        if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖"):
+        
+        # Tạo key unique cho button AI để tránh conflict
+        if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖", key="btn_ai_invest"):
              if api_key:
                 context = f"""
                 Dự án FDI Thẩm định:
                 - Vốn: {inv:,.0f} USD. CF hằng năm: {cf_yearly:,.0f} USD. Thanh lý: {salvage_val:,.0f} USD.
                 - Số năm: {years}. WACC: {wacc}%. Mất giá VND: {depre}%.
-                
-                KẾT QUẢ CHẠY MÔ HÌNH:
-                - NPV: {npv:,.0f} VND.
-                - Hoàn vốn sau (DPP): {payback_period if payback_period else 'Không bao giờ'} năm.
-                - IRR (Hoàn vốn nội bộ): {irr_value:.2f}%. (So với WACC là {wacc}%)
+                - NPV: {npv:,.0f} VND. IRR: {irr_value:.2f}%. DPP: {payback_period}.
                 """
-                
                 task = """
                 Đóng vai Giám đốc Tài chính (CFO). 
-                1. Nhận xét về tính khả thi của dự án dựa trên bộ chỉ số NPV và IRR (So sánh IRR với WACC).
-                2. Phân tích rủi ro tỷ giá: Với dự án thu dòng tiền USD (xuất khẩu/FDI), việc VND mất giá là lợi hay hại cho NPV tính bằng VND?
-                3. Đưa ra khuyến nghị cuối cùng: Duyệt (Approve) hay Từ chối (Reject)?
+                1. Nhận xét về tính khả thi của dự án (NPV, IRR vs WACC).
+                2. Phân tích rủi ro tỷ giá.
+                3. Đưa ra khuyến nghị: Duyệt hay Từ chối?
                 """
-                
                 with st.spinner("CFO đang phân tích..."):
                     advise = ask_gemini_advisor("CFO Advisor", context, task)
                     st.markdown(f'<div class="ai-box"><h4>🤖 CFO NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)

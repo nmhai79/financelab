@@ -167,11 +167,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏦 INTERNATIONAL FINANCE LAB")
-st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế")
+st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế (được thiết kế bởi ThS. Nguyễn Minh Hải")
 
 # --- MENU NAVIGATION (SIDEBAR CHUẨN) ---
 with st.sidebar:
-    st.header("🏢 SƠ ĐỒ TỔ CHỨC")
+    st.header("🏢 MÔ PHỎNG NGHIỆP VỤ")
     st.write("Di chuyển đến:")
     
     room = st.radio(
@@ -191,7 +191,7 @@ with st.sidebar:
     
     # --- BẢN QUYỀN (Copyright) ---
     st.markdown("---")
-    st.caption("© Copyright 2026 - Nguyễn Minh Hải")
+    st.caption("© 2026 - Nguyễn Minh Hải")
 
 # ==============================================================================
 # PHÒNG 1: DEALING ROOM
@@ -593,3 +593,4 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
+

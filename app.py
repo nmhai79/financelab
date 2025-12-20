@@ -249,51 +249,74 @@ if "1." in room:
     tab1, tab2 = st.tabs(["🔢 Niêm yết Tỷ giá Chéo", "⚡ Săn Arbitrage (Tam giác)"])
     
     with tab1:
+        st.subheader("🏦 Bảng điện tử Tỷ giá liên ngân hàng")
+        st.caption("Nhập tỷ giá thị trường quốc tế và nội địa để tính tỷ giá chéo (EUR/VND).")
+        
         c1, c2 = st.columns(2)
         with c1:
-            st.subheader("Thị trường 1: USD/VND")
-            usd_bid = st.number_input("BID (NH Mua vào):", value=25350.0, step=10.0)
-            usd_ask = st.number_input("ASK (NH Bán ra):", value=25450.0, step=10.0)
+            st.markdown("##### 🇺🇸 Thị trường 1: USD/VND")
+            usd_bid = st.number_input("BID (NH Mua USD):", value=25350.0, step=10.0, format="%.0f")
+            usd_ask = st.number_input("ASK (NH Bán USD):", value=25450.0, step=10.0, format="%.0f")
         with c2:
-            st.subheader("Thị trường 2: EUR/USD")
-            eur_bid = st.number_input("BID (NH Mua EUR):", value=1.0820, format="%.4f")
-            eur_ask = st.number_input("ASK (NH Bán EUR):", value=1.0850, format="%.4f")
+            st.markdown("##### 🇪🇺 Thị trường 2: EUR/USD")
+            eur_bid = st.number_input("BID (NH Mua EUR):", value=1.0820, step=0.0001, format="%.4f")
+            eur_ask = st.number_input("ASK (NH Bán EUR):", value=1.0850, step=0.0001, format="%.4f")
             
-        if st.button("🚀 TÍNH TOÁN & NIÊM YẾT"):
+        st.markdown("---")
+        
+        if st.button("🚀 TÍNH TOÁN & NIÊM YẾT", key="btn_cross_rate"):
+            # Tính toán
             cross_bid = eur_bid * usd_bid
             cross_ask = eur_ask * usd_ask
             spread = cross_ask - cross_bid
             
-            st.success(f"✅ TỶ GIÁ EUR/VND NIÊM YẾT: {cross_bid:,.0f} - {cross_ask:,.0f}")
-            st.info(f"Spread (Chênh lệch giá): {spread:,.0f} VND")
+            # Hiển thị kết quả chính
+            st.success(f"✅ TỶ GIÁ NIÊM YẾT (EUR/VND): {cross_bid:,.0f} - {cross_ask:,.0f}")
+            st.info(f"📊 Spread (Chênh lệch Mua-Bán): {spread:,.0f} VND/EUR")
             
-            # --- PHẦN GIẢI THÍCH ---
-            with st.expander("🎓 GIẢI THÍCH CÔNG THỨC & NGHIỆP VỤ", expanded=True):
-                st.markdown(r"""
-                **1. Công thức toán học:**
+            # --- PHẦN GIẢI THÍCH CHI TIẾT (UPDATED) ---
+            with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=True):
+                st.markdown("")
+                
+                # 1. Lý thuyết
+                st.markdown("#### 1. Công thức Toán học")
+                st.latex(r"\text{EUR/VND}_{Bid} = \text{EUR/USD}_{Bid} \times \text{USD/VND}_{Bid}")
+                st.latex(r"\text{EUR/VND}_{Ask} = \text{EUR/USD}_{Ask} \times \text{USD/VND}_{Ask}")
+                
+                st.divider()
+                
+                # 2. Áp dụng số liệu thực tế (Phần mới thêm)
+                st.markdown("#### 2. Áp dụng số liệu bạn vừa nhập")
+                st.write("Hệ thống đã thực hiện phép tính cụ thể như sau:")
+                
+                st.markdown(f"""
+                **a) Tính Tỷ giá Mua (BID):**
                 $$
-                \text{EUR/VND}_{Bid} = \text{EUR/USD}_{Bid} \times \text{USD/VND}_{Bid}
-                $$
-                $$
-                \text{EUR/VND}_{Ask} = \text{EUR/USD}_{Ask} \times \text{USD/VND}_{Ask}
+                {eur_bid:.4f} \\text{{ (EUR/USD Bid)}} \\times {usd_bid:,.0f} \\text{{ (USD/VND Bid)}} = \\mathbf{{{cross_bid:,.0f} \\text{{ VND}}}}
                 $$
                 
-                **2. Giải thích nghiệp vụ:**
-                Tại sao lại nhân `Bid x Bid`?
-                * Để Ngân hàng Mua EUR (trả VND) cho khách, ngân hàng phải thực hiện 2 bước trên thị trường quốc tế:
-                    1.  Mua EUR (trả bằng USD) -> Dùng tỷ giá **EUR/USD Bid**.
-                    2.  Bán ngay số USD đó (để lấy VND trả khách) -> Dùng tỷ giá mua USD của thị trường (tức **USD/VND Bid**).
-                * Do đó, Tỷ giá chéo Bid là tích của 2 tỷ giá Bid thành phần.
+                **b) Tính Tỷ giá Bán (ASK):**
+                $$
+                {eur_ask:.4f} \\text{{ (EUR/USD Ask)}} \\times {usd_ask:,.0f} \\text{{ (USD/VND Ask)}} = \\mathbf{{{cross_ask:,.0f} \\text{{ VND}}}}
+                $$
+                
+                **c) Tính Spread (Lợi nhuận gộp/Rủi ro):**
+                $$
+                {cross_ask:,.0f} \\text{{ (Ask)}} - {cross_bid:,.0f} \\text{{ (Bid)}} = \\mathbf{{{spread:,.0f} \\text{{ VND}}}}
+                $$
                 """)
-        st.markdown("---")
-        st.markdown(
-            """
-            <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
-                © 2026 Designed by Nguyễn Minh Hải
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+                
+                st.divider()
+
+                # 3. Giải thích nghiệp vụ
+                st.markdown("#### 3. Tại sao lại nhân `Bid x Bid`?")
+                st.info("""
+                Để Ngân hàng Việt Nam mua EUR từ khách hàng (trả VND), họ phải đi "đường vòng" qua USD:
+                1.  **Bước 1:** Ngân hàng bán EUR lấy USD trên thị trường quốc tế (Dùng giá Mua EUR của đối tác = **EUR/USD Bid**).
+                2.  **Bước 2:** Ngân hàng bán số USD đó lấy VND tại Việt Nam (Dùng giá Mua USD của thị trường = **USD/VND Bid**).
+                
+                👉 **Kết luận:** Tỷ giá chéo Bid luôn là tích của các tỷ giá Bid thành phần.
+                """)
 
     with tab2:
         st.header("⚡ Săn Arbitrage (Kinh doanh chênh lệch giá)")
@@ -378,7 +401,7 @@ if "1." in room:
         # --- BỔ SUNG AI CHO PHÒNG 1 ---
         st.markdown("---")
         # Dùng tham số icon="🤖" để render ổn định hơn
-        if st.button("Hỏi AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
+        if st.button("AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
             if api_key:
                 # Tính toán lại giá trị để gửi cho AI
                 s1 = 1000000 / bank_b
@@ -426,28 +449,83 @@ elif "2." in room:
 
     # --- 2. TÍNH TOÁN TỶ GIÁ KỲ HẠN (IRP) ---
     st.subheader("2. Tính Tỷ giá Kỳ hạn (Fair Forward Rate)")
-    st.caption("Bước đầu tiên: Xác định mức giá 'công bằng' dựa trên chênh lệch lãi suất VND và USD.")
-    
-    col_irp1, col_irp2, col_irp3 = st.columns(3)
-    with col_irp1:
-        spot_irp = st.number_input("Spot Rate (Hiện tại):", value=25000.0, step=10.0)
-    with col_irp2:
-        r_vnd = st.number_input("Lãi suất VND (%/năm):", value=6.0, step=0.1)
-    with col_irp3:
-        r_usd = st.number_input("Lãi suất USD (%/năm):", value=3.0, step=0.1)
-        
-    # Công thức IRP
-    fwd_cal = spot_irp * (1 + (r_vnd/100)*(days_loan/360)) / (1 + (r_usd/100)*(days_loan/360))
-    
-    # Hiển thị kết quả & Công thức
-    col_res_irp1, col_res_irp2 = st.columns([1, 2])
-    with col_res_irp1:
-        st.metric("Tỷ giá Forward (IRP)", f"{fwd_cal:,.2f} VND")
-    with col_res_irp2:
-        with st.expander("🎓 CÔNG THỨC IRP"):
-            st.latex(r"F = S \times \frac{1 + r_{VND} \times \frac{n}{360}}{1 + r_{USD} \times \frac{n}{360}}")
-            st.caption("Nguyên lý: Lãi suất VND cao hơn USD -> VND sẽ giảm giá trong tương lai (Forward > Spot).")
+    st.caption("Công cụ định giá Forward dựa trên chênh lệch lãi suất VND và USD.")
 
+    # 1. INPUT DATA
+    c_input1, c_input2, c_input3, c_input4 = st.columns(4)
+    with c_input1:
+        spot_irp = st.number_input("Spot Rate (Hiện tại):", value=25000.0, step=10.0, format="%.0f")
+    with c_input2:
+        r_vnd = st.number_input("Lãi suất VND (%/năm):", value=6.0, step=0.1)
+    with c_input3:
+        r_usd = st.number_input("Lãi suất USD (%/năm):", value=3.0, step=0.1)
+    with c_input4:
+        days_loan = st.number_input("Kỳ hạn (Ngày):", value=90, step=30)
+        
+    # 2. TÍNH TOÁN LOGIC
+    # Công thức: F = S * (1 + r_vnd * n/360) / (1 + r_usd * n/360)
+    numerator = 1 + (r_vnd/100)*(days_loan/360)
+    denominator = 1 + (r_usd/100)*(days_loan/360)
+    fwd_cal = spot_irp * (numerator / denominator)
+    swap_point = fwd_cal - spot_irp
+    
+    st.markdown("---")
+
+    # 3. HIỂN THỊ KẾT QUẢ & GIẢI THÍCH (Tỷ lệ 1:1.5)
+    col_res_irp1, col_res_irp2 = st.columns([1, 1.5])
+    
+    # --- CỘT TRÁI: KẾT QUẢ SỐ LIỆU ---
+    with col_res_irp1:
+        st.markdown("##### 🏁 KẾT QUẢ TÍNH TOÁN")
+        st.metric("Tỷ giá Forward (F)", f"{fwd_cal:,.0f} VND", help="Tỷ giá kỳ hạn hợp lý theo IRP")
+        
+        # Hiển thị Swap Point
+        st.metric("Điểm kỳ hạn (Swap Point)", f"{swap_point:,.0f} VND", 
+                 delta="VND giảm giá (Forward > Spot)" if swap_point > 0 else "VND tăng giá (Forward < Spot)", 
+                 delta_color="inverse")
+        
+        # Tóm tắt nhanh
+        if r_vnd > r_usd:
+            st.warning(f"📉 **Quy luật:** Lãi suất VND cao hơn USD ({r_vnd}% > {r_usd}%), nên VND bị thị trường 'trừ điểm' (giảm giá) trong tương lai.")
+        else:
+            st.success(f"📈 **Quy luật:** Lãi suất VND thấp hơn USD, nên VND được 'cộng điểm' (tăng giá).")
+    
+    # --- CỘT PHẢI: GÓC HỌC TẬP (GIẢI MÃ) ---
+    with col_res_irp2:
+        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ IRP & CÔNG THỨC", expanded=True):
+            st.markdown("")
+            
+            # --- [MỚI] 1. GIẢI THÍCH THUẬT NGỮ ---
+            st.markdown("#### 1. IRP là gì?")
+            st.info("""
+            **IRP** là viết tắt của **Interest Rate Parity** (Ngang giá Lãi suất).
+            
+            💡 **Ý nghĩa:** Đây là điều kiện cân bằng mà tại đó chênh lệch lãi suất giữa hai quốc gia bằng đúng chênh lệch giữa tỷ giá kỳ hạn và tỷ giá giao ngay. 
+            Nói đơn giản: **"Chênh lệch lãi suất = Chênh lệch tỷ giá"**.
+            """)
+
+            # 2. CÔNG THỨC & THAY SỐ
+            st.markdown("#### 2. Công thức tính toán")
+            st.latex(r"F = S \times \frac{1 + r_{VND} \times \frac{n}{360}}{1 + r_{USD} \times \frac{n}{360}}")
+            st.caption("Thay số cụ thể từ dữ liệu bạn nhập:")
+            st.latex(f"F = {spot_irp:,.0f} \\times \\frac{{1 + {r_vnd}\\% \\times \\frac{{{days_loan}}}{{360}}}}{{1 + {r_usd}\\% \\times \\frac{{{days_loan}}}{{360}}}} = \\mathbf{{{fwd_cal:,.0f} \\text{{ VND}}}}")
+            
+            st.divider()
+            
+            # 3. ĐIỂM KỲ HẠN
+            st.markdown("#### 3. Điểm kỳ hạn (Swap Point)")
+            st.write("Là chênh lệch giá trị tuyệt đối giữa Forward và Spot:")
+            st.latex(f"\\text{{Swap}} = {fwd_cal:,.0f} - {spot_irp:,.0f} = \\mathbf{{{swap_point:,.0f} \\text{{ VND}}}}")
+
+            st.divider()
+
+            # 4. BẢN CHẤT
+            st.markdown("#### 4. Tại sao có quy luật này?")
+            st.write("""
+            Theo nguyên lý **"Không có bữa trưa miễn phí" (No Arbitrage)**:
+            * Nếu bạn gửi VND lãi cao ({r_vnd}%) mà tỷ giá VND không giảm, thì ai cũng bán USD để gửi VND -> Lãi to.
+            * Để ngăn điều này, thị trường buộc VND phải **mất giá** trong tương lai để triệt tiêu phần lãi suất chênh lệch đó.
+            """)
     st.markdown("---")
 
     # --- 3. MA TRẬN RA QUYẾT ĐỊNH (DECISION MATRIX) ---
@@ -570,7 +648,7 @@ elif "2." in room:
 
     # --- AI ADVISOR ---
     st.markdown("---")
-    if st.button("Hỏi AI CFO: Phân tích chuyên sâu", type="primary", icon="🤖"):
+    if st.button("AI CFO: Phân tích chuyên sâu", type="primary", icon="🤖"):
         if api_key:
             context = f"""
             Bài toán: Nợ {debt_amount:,.0f} USD. Spot hiện tại: {spot_irp}.
@@ -610,7 +688,7 @@ elif "3." in room:
     </div>
     """, unsafe_allow_html=True)
     
-    tab_cost, tab_check = st.tabs(["💰 Bài toán Chi phí (L/C vs T/T)", "📝 Kiểm tra Chứng từ (Checking)"])
+    tab_cost, tab_check = st.tabs(["💰 Bài toán Chi phí (T/T, Nhờ thu, L/C)", "📝 Kiểm tra Chứng từ (Checking)"])
     
     with tab_cost:
         st.header("💸 Bài toán Tối ưu Chi phí Thanh toán Quốc tế")
@@ -712,48 +790,91 @@ elif "3." in room:
             })
             st.bar_chart(chart_data.set_index("Phương thức"), stack=True, color=["#FF6C6C", "#4B4BFF"])
 
-            # --- [QUAN TRỌNG] DIỄN GIẢI CÔNG THỨC (SHOW YOUR WORK) ---
+            # --- [QUAN TRỌNG] DIỄN GIẢI CÔNG THỨC (FIXED DISPLAY) ---
             st.markdown("### 🧮 Bảng chi tiết lời giải (Step-by-step)")
             st.info("Dưới đây là cách tính chi tiết giúp bạn hiểu rõ nguồn gốc các con số:")
 
+            # Lưu ý: Dùng ký tự \$ để tránh lỗi xung đột với công thức toán LaTeX ($...$)
+            
+            # 1. T/T (CHUYỂN TIỀN)
             with st.expander("1️⃣ Chi tiết tính toán: T/T (Chuyển tiền)", expanded=False):
-                st.latex(r"Cost_{T/T} = Phí_{Bank} + Lãi_{Vốn}")
+                st.latex(r"Cost_{T/T} = \text{Phí Bank} + \text{Lãi Vốn}")
+                
+                # Sử dụng dedent hoặc viết sát lề để tránh lỗi hiển thị code block
                 st.markdown(f"""
-                * **Phí Ngân hàng:** {val:,.0f} x {tt_pct}% = {tt_raw:,.2f}. 
-                  *(So sánh Min ${tt_min} / Max ${tt_max} \u2192 Lấy: **${tt_bank_fee:,.2f}**)* + Điện phí ${tt_other} = **${tt_total_bank:,.2f}**
-                * **Chi phí vốn:** {val:,.0f} x {interest_rate}% x ({days_tt}/360 ngày) = **${tt_interest:,.2f}**
-                * 👉 **TỔNG:** {tt_total_bank:,.2f} + {tt_interest:,.2f} = **${tt_final:,.2f}**
+**A. Phí dịch vụ Ngân hàng:**
+* Tính sơ bộ: {val:,.0f} USD × {tt_pct}% = {tt_raw:,.2f} USD
+* So sánh Min/Max ({tt_min} - {tt_max}) → Phí áp dụng: **{tt_bank_fee:,.2f} USD**
+* Cộng Điện phí ({tt_other} USD) → Tổng phí Bank: **{tt_total_bank:,.2f} USD**
+
+**B. Chi phí vốn (Lãi vay):**
+* Công thức: $\\text{{Giá trị}} \\times \\text{{Lãi suất}} \\times \\frac{{\\text{{Ngày}}}}{{360}}$
+* Thế số: {val:,.0f} × {interest_rate}% × ({days_tt}/360) = **{tt_interest:,.2f} USD**
+
+👉 **TỔNG CHI PHÍ T/T:** {tt_total_bank:,.2f} + {tt_interest:,.2f} = **{tt_final:,.2f} USD**
                 """)
 
+            # 2. COLLECTION (NHỜ THU)
             with st.expander("2️⃣ Chi tiết tính toán: Nhờ thu (Collection)", expanded=False):
-                st.latex(r"Cost_{Col} = Phí_{NhờThu} + Phí_{Khác} + Lãi_{Vốn}")
+                st.latex(r"Cost_{Col} = \text{Phí Nhờ Thu} + \text{Phí Khác} + \text{Lãi Vốn}")
+                
                 st.markdown(f"""
-                * **Phí Ngân hàng:** {val:,.0f} x {col_pct}% = {col_raw:,.2f}. 
-                  *(So sánh Min ${col_min} / Max ${col_max} \u2192 Lấy: **${col_bank_fee:,.2f}**)* + Phí khác ${col_other} = **${col_total_bank:,.2f}**
-                * **Chi phí vốn:** {val:,.0f} x {interest_rate}% x ({days_col}/360 ngày) = **${col_interest:,.2f}**
-                * 👉 **TỔNG:** {col_total_bank:,.2f} + {col_interest:,.2f} = **${col_final:,.2f}**
+**A. Phí dịch vụ Ngân hàng:**
+* Tính sơ bộ: {val:,.0f} USD × {col_pct}% = {col_raw:,.2f} USD
+* So sánh Min/Max ({col_min} - {col_max}) → Phí áp dụng: **{col_bank_fee:,.2f} USD**
+* Cộng phí khác ({col_other} USD) → Tổng phí Bank: **{col_total_bank:,.2f} USD**
+
+**B. Chi phí vốn:**
+* Thế số: {val:,.0f} × {interest_rate}% × ({days_col}/360) = **{col_interest:,.2f} USD**
+
+👉 **TỔNG CHI PHÍ COLLECTION:** {col_total_bank:,.2f} + {col_interest:,.2f} = **{col_final:,.2f} USD**
                 """)
 
+            # 3. L/C (TÍN DỤNG THƯ)
             with st.expander("3️⃣ Chi tiết tính toán: L/C (Tín dụng thư)", expanded=True):
-                st.latex(r"Cost_{LC} = Phí_{Mở} + Phí_{TT} + Phí_{Khác} + Lãi_{Vốn}")
+                st.latex(r"Cost_{LC} = \text{Phí Mở} + \text{Phí T.Toán} + \text{Phí Khác} + \text{Lãi Vốn}")
+                
                 st.markdown(f"""
-                * **Phí Mở L/C:** Max({val:,.0f} x {lc_open_pct}%, Min ${lc_min}) = **${lc_open_fee:,.2f}**
-                * **Phí Thanh toán:** {val:,.0f} x {lc_pay_pct}% = **${lc_pay_fee:,.2f}**
-                * **Phí Khác:** **${lc_other:,.2f}**
-                * **Chi phí vốn (Nặng nhất):** {val:,.0f} x {interest_rate}% x ({days_lc}/360 ngày) = **${lc_interest:,.2f}**
-                * 👉 **TỔNG:** {lc_total_bank:,.2f} + {lc_interest:,.2f} = **${lc_final:,.2f}**
+**A. Các loại phí Ngân hàng:**
+* Phí Mở L/C: {val:,.0f} × {lc_open_pct}% = {lc_open_fee:,.2f} USD *(Tối thiểu {lc_min} USD)*
+* Phí Thanh toán: {val:,.0f} × {lc_pay_pct}% = {lc_pay_fee:,.2f} USD
+* Phí Khác: {lc_other:,.2f} USD
+
+**B. Chi phí vốn (Gánh nặng lớn nhất):**
+* Do L/C giữ vốn lâu hơn ({days_lc} ngày), tiền lãi phát sinh là:
+* {val:,.0f} × {interest_rate}% × ({days_lc}/360) = **{lc_interest:,.2f} USD**
+
+👉 **TỔNG CHI PHÍ L/C:** {lc_total_bank:,.2f} (Bank) + {lc_interest:,.2f} (Lãi) = **{lc_final:,.2f} USD**
                 """)
                 
-            # --- KẾT LUẬN CUỐI CÙNG ---
+            # --- KẾT LUẬN QUẢN TRỊ ---
+            st.markdown("---")
             diff_val = lc_final - tt_final
+            
+            #  - có thể thêm diagram ở đây nếu cần minh họa quy trình
+            
             if diff_val > 0:
-                st.success(f"""
-                💡 **Góc nhìn Quản trị:** Để có được sự an toàn của L/C, bạn phải trả thêm **${diff_val:,.2f}** so với T/T. 
-                Hãy tự hỏi: *"Rủi ro mất trắng lô hàng trị giá ${val:,.0f} có đáng sợ hơn con số ${diff_val:,.2f} này không?"* Nếu có, L/C là lựa chọn đúng đắn!
-                """)
+                # Dùng st.container để bọc nội dung, giúp định dạng markdown ổn định hơn
+                with st.container():
+                    st.success(f"""
+                    #### 💡 GÓC NHÌN QUẢN TRỊ
+                    
+                    Để có được sự an toàn tuyệt đối của phương thức L/C, doanh nghiệp phải trả thêm chi phí bảo hiểm rủi ro là:
+                    
+                    # {diff_val:,.2f} USD
+                    *(Chênh lệch giữa L/C và T/T)*
+                    
+                    Hãy tự đặt câu hỏi: **"Việc loại bỏ rủi ro mất trắng lô hàng trị giá {val:,.0f} USD có xứng đáng với mức phí {diff_val:,.2f} USD này không?"**
+                    
+                    Nếu câu trả lời là **CÓ**, thì L/C là phương án tối ưu!
+                    """)
             else:
-                st.warning("Trong trường hợp đặc biệt này, L/C đang rẻ hơn hoặc bằng T/T (do cấu hình phí/lãi suất). Hãy kiểm tra lại số liệu thực tế.")
-
+                st.warning(f"""
+                ⚠️ **TRƯỜNG HỢP ĐẶC BIỆT:**
+                Hiện tại chi phí L/C đang **RẺ HƠN** hoặc **BẰNG** T/T.
+                * Chênh lệch: {diff_val:,.2f} USD
+                * Nguyên nhân: Có thể do số ngày chiếm dụng vốn (Days) của T/T đang được cấu hình quá cao.
+                """)
         st.markdown("---")
         st.markdown(
             """
@@ -881,7 +1002,7 @@ elif "3." in room:
         
         # --- NÚT GỌI AI (ĐÃ NÂNG CẤP CONTEXT CHI TIẾT) ---
         st.markdown("---")
-        if st.button("Hỏi AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖"):
+        if st.button("AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖"):
             if api_key:
                 # 1. TÍNH LẠI LOGIC (Để đảm bảo có dữ liệu mới nhất ngay cả khi chưa bấm nút Soát xét)
                 curr_errs = []
@@ -942,119 +1063,257 @@ elif "3." in room:
             """, 
             unsafe_allow_html=True
         )
-
 # ==============================================================================
-# PHÒNG 4: INVESTMENT DEPT
+# PHÒNG 4: ĐẦU TƯ QUỐC TẾ
 # ==============================================================================
 elif "4." in room:
-    st.markdown('<p class="header-style">🏭 Phòng Đầu tư Quốc tế (Investment Dept)</p>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="role-card">
-        <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư (Investment Analyst)</div>
-        <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI bằng mô hình DCF, có tính đến sự trượt giá của đồng nội tệ (Currency Depreciation)."</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # --- 1. INPUTS ---
-    c1, c2 = st.columns(2)
-    with c1:
-        inv = st.number_input("Vốn đầu tư ban đầu (USD):", value=1000000, step=10000)
-        cf = st.number_input("Dòng tiền ròng/năm (USD):", value=400000, step=5000)
-        years = st.slider("Vòng đời dự án (năm):", 1, 10, 3)
-    with c2:
-        fx = st.number_input("Tỷ giá Spot hiện tại:", value=25000.0, step=10.0)
-        depre = st.number_input("Mức độ mất giá VND (%/năm):", value=3.0, step=0.1)
-        wacc = st.number_input("Chi phí vốn (WACC %):", value=12.0, step=0.5)
-        
-    # --- 2. TÍNH TOÁN & HIỂN THỊ BẢNG ---
-    if st.button("📊 LẬP BẢNG DÒNG TIỀN (CF)"):
-        st.subheader("Bảng chiết khấu dòng tiền chi tiết:")
-        data = []
-        total_pv = 0
-        
-        # Năm 0
-        cf0_vnd = -inv * fx
-        data.append(["Năm 0", fx, f"{-inv:,.0f}", f"{cf0_vnd:,.0f}", f"{cf0_vnd:,.0f}"])
-        
-        # Vòng lặp tính toán
-        for i in range(1, years + 1):
-            fx_future = fx * ((1 + depre/100) ** i) # Tỷ giá tương lai
-            cf_vnd = cf * fx_future                 # Quy đổi ra VND
-            pv = cf_vnd / ((1 + wacc/100) ** i)     # Chiết khấu về hiện tại
-            total_pv += pv
-            data.append([f"Năm {i}", f"{fx_future:,.0f}", f"{cf:,.0f}", f"{cf_vnd:,.0f}", f"{pv:,.0f}"])
+            st.markdown('<p class="header-style">🏭 Phòng Đầu tư Quốc tế (Investment Dept)</p>', unsafe_allow_html=True)
             
-        npv = total_pv + cf0_vnd
-        
-        df_cf = pd.DataFrame(data, columns=["Năm", "Tỷ giá (Dự báo)", "CF (USD)", "CF Quy đổi (VND)", "PV (Hiện giá)"])
-        st.table(df_cf)
-        
-        # Hiển thị kết quả NPV
-        if npv > 0:
-            st.success(f"### 🏁 KẾT QUẢ: DỰ ÁN CÓ LÃI (NPV = {npv:,.0f} VND)")
-        else:
-            st.error(f"### 🏁 KẾT QUẢ: DỰ ÁN THUA LỖ (NPV = {npv:,.0f} VND)")
-        
-        with st.expander("🎓 GIẢI THÍCH MÔ HÌNH NPV QUỐC TẾ"):
-            st.latex(r"NPV = CF_0 + \sum_{t=1}^{n} \frac{CF_{USD, t} \times S_t}{(1 + WACC)^t}")
-            st.write("""
-            Khác với NPV thông thường, dự án quốc tế chịu tác động kép:
-            1.  **Dòng tiền kinh doanh:** (CF USD)
-            2.  **Rủi ro tỷ giá:** ($S_t$) - Nếu VND mất giá, doanh thu quy đổi sẽ tăng (lợi cho xuất khẩu/đầu tư mang ngoại tệ về), nhưng chi phí vốn cũng thay đổi.
-            """)
+            st.markdown("""
+            <div class="role-card">
+                <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư (Investment Analyst)</div>
+                <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI, Phân tích độ nhạy (Sensitivity Analysis) và Đánh giá rủi ro tỷ giá."</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # --- 1. INPUTS ---
+            with st.expander("📝 THÔNG SỐ DỰ ÁN ĐẦU TƯ", expanded=True):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.markdown("##### 1. Dòng tiền Dự án (USD)")
+                    inv = st.number_input("Vốn đầu tư ban đầu (CapEx):", value=1000000.0, step=10000.0, format="%.0f")
+                    cf_yearly = st.number_input("Dòng tiền ròng hằng năm (Operating CF):", value=300000.0, step=5000.0, format="%.0f")
+                    salvage_val = st.number_input("Giá trị thanh lý cuối kỳ (Terminal Value):", value=200000.0, help="Tiền bán thanh lý tài sản khi kết thúc dự án")
+                    years = st.slider("Vòng đời dự án (năm):", 3, 10, 5)
+                    
+                with c2:
+                    st.markdown("##### 2. Thị trường & Vĩ mô")
+                    fx_spot = st.number_input("Tỷ giá Spot hiện tại (VND/USD):", value=25000.0, step=10.0)
+                    depre = st.number_input("Mức độ mất giá VND (%/năm):", value=3.0, step=0.1, help="Dự báo VND mất giá bao nhiêu % so với USD mỗi năm")
+                    wacc = st.number_input("Chi phí vốn (WACC %):", value=12.0, step=0.5, help="Tỷ suất sinh lời yêu cầu của nhà đầu tư")
+                    
+            st.markdown("---")
 
-    # --- 3. AI ADVISOR (Đã sửa lỗi hardcode) ---
-    st.markdown("---")
-    
-    if st.button("🤖 CFO AI Advisor: Thẩm định dự án", type="primary", icon="🤖"):
-        if api_key:
-            # TÍNH NHANH NPV ĐỂ GỬI CHO AI (Phòng trường hợp sinh viên chưa bấm nút Lập bảng ở trên)
-            # -------------------------------------------------------------------------------------
-            temp_total_pv = 0
-            temp_cf0_vnd = -inv * fx
-            for i in range(1, years + 1):
-                temp_fx = fx * ((1 + depre/100) ** i)
-                temp_pv = (cf * temp_fx) / ((1 + wacc/100) ** i)
-                temp_total_pv += temp_pv
-            npv_preview = temp_total_pv + temp_cf0_vnd
-            # -------------------------------------------------------------------------------------
+            # --- 2. TÍNH TOÁN & HIỂN THỊ ---
+            if st.button("📊 CHẠY MÔ HÌNH DCF & PHÂN TÍCH ĐỘ NHẠY"):
+                
+                # A. TÍNH DÒNG TIỀN CƠ SỞ (BASE CASE)
+                # -----------------------------------
+                data_cf = []
+                cumulative_pv = 0
+                payback_period = None
+                
+                # Năm 0
+                cf0_vnd = -inv * fx_spot
+                cumulative_pv += cf0_vnd
+                data_cf.append({
+                    "Năm": 0, 
+                    "Tỷ giá (VND/USD)": fx_spot, 
+                    "CF (USD)": -inv, 
+                    "CF Quy đổi (VND)": cf0_vnd, 
+                    "PV (Hiện giá VND)": cf0_vnd, 
+                    "Lũy kế PV": cumulative_pv
+                })
+                
+                # Năm 1 -> n
+                for i in range(1, years + 1):
+                    # Tính tỷ giá tương lai: S_t = S_0 * (1 + delta)^t
+                    fx_future = fx_spot * ((1 + depre/100) ** i)
+                    
+                    # Tính dòng tiền USD: Operating CF + Terminal Value (nếu là năm cuối)
+                    cf_usd = cf_yearly + (salvage_val if i == years else 0)
+                    
+                    # Quy đổi VND: CF_VND = CF_USD * S_t
+                    cf_vnd = cf_usd * fx_future
+                    
+                    # Chiết khấu: PV = CF_VND / (1 + WACC)^t
+                    pv_vnd = cf_vnd / ((1 + wacc/100) ** i)
+                    
+                    # Lưu lại giá trị lũy kế cũ để tính Payback Period
+                    prev_cumulative = cumulative_pv
+                    cumulative_pv += pv_vnd
+                    
+                    # Check thời gian hoàn vốn (Lần đầu tiên Lũy kế chuyển từ Âm sang Dương)
+                    if payback_period is None and cumulative_pv >= 0:
+                        # Công thức nội suy: Năm trước + (Số tiền còn thiếu / Dòng tiền năm nay)
+                        fraction = abs(prev_cumulative) / pv_vnd
+                        payback_period = (i - 1) + fraction
+                    
+                    data_cf.append({
+                        "Năm": i, 
+                        "Tỷ giá (VND/USD)": fx_future, 
+                        "CF (USD)": cf_usd, 
+                        "CF Quy đổi (VND)": cf_vnd, 
+                        "PV (Hiện giá VND)": pv_vnd, 
+                        "Lũy kế PV": cumulative_pv
+                    })
+                    
+                npv = cumulative_pv # NPV chính là Lũy kế năm cuối cùng
+                
+                # B. HIỂN THỊ KẾT QUẢ
+                # -----------------------------------
+                st.subheader("1. Kết quả Thẩm định")
+                
+                m1, m2, m3 = st.columns(3)
+                m1.metric("NPV (Giá trị hiện tại ròng)", f"{npv:,.0f} VND", 
+                         delta="Đáng đầu tư" if npv > 0 else "Không nên đầu tư")
+                
+                if payback_period:
+                    m2.metric("Thời gian hoàn vốn (DPP)", f"{payback_period:.2f} Năm")
+                else:
+                    m2.metric("Thời gian hoàn vốn", "Chưa hoàn vốn", delta_color="inverse")
+                    
+                roi = (npv / abs(cf0_vnd)) * 100
+                m3.metric("ROI (Tỷ suất sinh lời)", f"{roi:.2f}%", help="=(NPV / Vốn đầu tư ban đầu) * 100")
 
-            # Tạo Context động (Dynamic String)
-            context = f"""
-            Bài toán Thẩm định dự án FDI:
-            1. Vốn đầu tư: {inv:,.0f} USD.
-            2. Dòng tiền thu về: {cf:,.0f} USD/năm trong {years} năm.
-            3. Tỷ giá hiện tại: {fx:,.0f}. Mất giá dự kiến: {depre}%/năm.
-            4. WACC (Chi phí vốn): {wacc}%.
-            
-            KẾT QUẢ TÍNH TOÁN:
-            -> NPV (Giá trị hiện tại ròng): {npv_preview:,.0f} VND.
-            """
-            
-            task = """
-            Đóng vai Chuyên gia Thẩm định Đầu tư (Investment Banker).
-            Hãy phân tích SWOT kết quả trên:
-            - Dựa vào NPV Âm hay Dương để đưa ra kết luận: "Nên đầu tư" hay "Hủy bỏ".
-            - Phân tích rủi ro tỷ giá: Việc đồng nội tệ mất giá đang có lợi hay có hại cho dự án này (Lưu ý: Doanh thu bằng USD quy đổi ra VND sẽ tăng khi VND mất giá).
-            - Cảnh báo thêm về rủi ro vĩ mô (Lạm phát, chính sách).
-            """
-            
-            with st.spinner(f"AI đang thẩm định dự án {inv:,.0f}$..."):
-                advise = ask_gemini_advisor("Investment Expert", context, task)
-                st.markdown(f'<div class="ai-box"><h4>🤖 PHÂN TÍCH CHIẾN LƯỢC ĐẦU TƯ</h4>{advise}</div>', unsafe_allow_html=True)
-        else:
-             st.warning("⚠️ Vui lòng nhập API Key.")
+                # Biểu đồ kết hợp
+                df_chart = pd.DataFrame(data_cf)
+                st.bar_chart(df_chart.set_index("Năm")[["PV (Hiện giá VND)"]], color="#4B4BFF")
+                
+                with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
+                    st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
 
-    st.markdown("---")
-    st.markdown(
-        """
-        <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
-            © 2026 Designed by Nguyễn Minh Hải
-        </div>
-        """, 
-        unsafe_allow_html=True
-    )
+                # --- [NEW] C. GIẢI THÍCH CÔNG THỨC (EDUCATIONAL PART) ---
+                # --------------------------------------------------------
+                with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC (READING MATERIAL)", expanded=True):
+                    st.markdown("#### 1. Công thức tính NPV Điều chỉnh Tỷ giá")
+                    st.markdown("Mô hình này khác NPV thông thường vì dòng tiền USD phải được quy đổi ra VND theo tỷ giá kỳ vọng từng năm trước khi chiết khấu.")
+                    
+                    # FIX: Dùng \text{WACC} để chữ hiển thị liền nhau đẹp hơn
+                    st.latex(r"NPV = -I_0 \times S_0 + \sum_{t=1}^{n} \frac{(CF_{t, USD} + TV_n) \times S_t}{(1 + \text{WACC})^t}")
+                    
+                    st.markdown(f"""
+                    **Trong đó:**
+                    * $I_0$: Vốn đầu tư ban đầu ({inv:,.0f} USD).
+                    * $CF_{{t, USD}}$: Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
+                    * $TV_n$: Giá trị thanh lý năm cuối ({salvage_val:,.0f} USD).
+                    * $S_t$: Tỷ giá dự báo năm $t$, tính bằng: $S_0 \times (1 + {depre}\%)^t$.
+                    * $\\text{{WACC}}$: Chi phí vốn ({wacc}%).
+                    """)
+                    
+                    st.divider()
+                    
+                    # --- 2. CÔNG THỨC DPP (ĐÃ SỬA LỖI TRUY XUẤT DỮ LIỆU) ---
+                    st.markdown("#### 2. Công thức Thời gian hoàn vốn (DPP)")
+                    
+                    # A. Hiển thị công thức tổng quát
+                    st.latex(r"DPP = Y_{negative} + \frac{|PV_{Cumulative}|}{PV_{NextYear}}")
+                    
+                    # B. Giải thích các tham số (Legend)
+                    st.markdown("""
+                    **Trong đó:**
+                    * $Y_{negative}$: Số năm mà dòng tiền lũy kế vẫn còn âm (Năm liền trước khi hoàn vốn).
+                    * $|PV_{Cumulative}|$: Số vốn "còn thiếu" tại cuối năm $Y_{negative}$ (Lấy trị tuyệt đối).
+                    * $PV_{NextYear}$: Dòng tiền (đã chiết khấu) thu được trong năm kế tiếp.
+                    """)
+
+                    # C. Ráp số liệu thực tế (Plug-in Values)
+                    if payback_period:
+                        y_neg_idx = int(payback_period) # Ví dụ: 4
+                        
+                        try:
+                            # [FIX] Lấy dữ liệu từ mảng data_cf đã tính ở trên
+                            # data_cf là list of dicts, index 0 là năm 0, index 1 là năm 1...
+                            # Nên index trùng với số năm
+                            
+                            val_missing = abs(data_cf[y_neg_idx]["Lũy kế PV"]) # Số tiền còn thiếu (dương)
+                            val_next = data_cf[y_neg_idx + 1]["PV (Hiện giá VND)"] # Tiền kiếm được năm sau
+                            
+                            st.markdown("👇 **Áp dụng số liệu dự án:**")
+                            st.latex(f"DPP = {y_neg_idx} + \\frac{{|{val_missing:,.0f}|}}{{{val_next:,.0f}}} = \\mathbf{{{payback_period:.2f} \\text{{ Năm}}}}")
+                            
+                            st.info(f"""
+                            💡 **Diễn giải:** Dự án mất **{y_neg_idx} năm** chẵn để gần hòa vốn. 
+                            Tại cuối năm {y_neg_idx}, dự án vẫn còn thiếu **{val_missing:,.0f} VND**. 
+                            Sang năm {y_neg_idx + 1}, dự án kiếm được **{val_next:,.0f} VND**, đủ bù đắp phần thiếu đó.
+                            """)
+                        except Exception as e:
+                            # Fallback nếu index vượt quá giới hạn (ít gặp)
+                            st.warning(f"Đã tính được DPP ({payback_period:.2f} năm), nhưng không thể hiển thị chi tiết phép chia.")
+                    else:
+                        st.info("Dự án chưa hoàn vốn nên không thể áp dụng công thức chi tiết.")
+
+                    st.divider()
+
+                    # --- 3. PHÂN TÍCH ĐỘ NHẠY (GIỮ NGUYÊN) ---
+                    st.markdown("#### 3. Tại sao cần Phân tích Độ nhạy (Sensitivity)?")
+                    st.write("""
+                    Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. 
+                    Ma trận bên dưới (Sensitivity Matrix) giúp trả lời câu hỏi: 
+                    *"Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?"*
+                    """)
+
+                # D. PHÂN TÍCH ĐỘ NHẠY (SENSITIVITY ANALYSIS)
+                # ------------------------------------------------------
+                st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
+                
+                # Tạo ma trận biến thiên
+                wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
+                depre_range = [depre - 2, depre - 1, depre, depre + 1, depre + 2]
+                
+                sensitivity_data = []
+                for w in wacc_range:
+                    row = []
+                    for d in depre_range:
+                        # Tính nhanh NPV loop
+                        sim_npv = -inv * fx_spot
+                        for t in range(1, years + 1):
+                            sim_fx = fx_spot * ((1 + d/100) ** t)
+                            sim_cf_usd = cf_yearly + (salvage_val if t == years else 0)
+                            sim_npv += (sim_cf_usd * sim_fx) / ((1 + w/100) ** t)
+                        row.append(sim_npv)
+                    sensitivity_data.append(row)
+                    
+                df_sens = pd.DataFrame(
+                    sensitivity_data, 
+                    index=[f"WACC {w:.1f}%" for w in wacc_range],
+                    columns=[f"Mất giá {d:.1f}%" for d in depre_range]
+                )
+                
+                def color_negative_red(val):
+                    color = '#ffcccc' if val < 0 else '#ccffcc'
+                    return f'background-color: {color}; color: black'
+
+                st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
+                
+                # E. AI ADVISOR (Context Updated)
+                # -------------------------------
+                st.markdown("---")
+                if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖"):
+                     if api_key:
+                        context = f"""
+                        Dự án FDI Thẩm định:
+                        - Vốn: {inv:,.0f} USD. CF hằng năm: {cf_yearly:,.0f} USD. Thanh lý: {salvage_val:,.0f} USD.
+                        - Số năm: {years}. WACC: {wacc}%. Mất giá VND: {depre}%.
+                        
+                        KẾT QUẢ CHẠY MÔ HÌNH:
+                        - NPV: {npv:,.0f} VND.
+                        - Hoàn vốn sau: {payback_period if payback_period else 'Không bao giờ'} năm.
+                        - ROI: {roi:.1f}%.
+                        """
+                        
+                        task = """
+                        Đóng vai Giám đốc Tài chính (CFO). 
+                        1. Nhận xét về tính khả thi của dự án (Dựa trên NPV và Thời gian hoàn vốn).
+                        2. Phân tích rủi ro tỷ giá: Với dự án thu dòng tiền USD (doanh thu xuất khẩu/FDI), việc VND mất giá là lợi hay hại? Tại sao?
+                        3. Đưa ra khuyến nghị cuối cùng: Duyệt (Approve) hay Từ chối (Reject)?
+                        """
+                        
+                        with st.spinner("CFO đang phân tích..."):
+                            advise = ask_gemini_advisor("CFO Advisor", context, task)
+                            st.markdown(f'<div class="ai-box"><h4>🤖 CFO NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
+                     else:
+                        st.warning("⚠️ Vui lòng nhập API Key.")
+
+            st.markdown("---")
+            st.markdown(
+                """
+                <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
+                    © 2026 Designed by Nguyễn Minh Hải
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
 
 # ==============================================================================
 # PHÒNG 5: MACRO STRATEGY (CÓ TÍCH HỢP AI)
@@ -1065,136 +1324,168 @@ elif "5." in room:
     st.markdown("""
     <div class="role-card">
         <div class="role-title">👤 Vai diễn: Chuyên gia Chiến lược Vĩ mô (Macro Strategist)</div>
-        <div class="mission-text">"Nhiệm vụ: Phân tích 'Tác động kép' của tỷ giá: (1) Đo lường gánh nặng Nợ công quốc gia (Currency Mismatch) và (2) Đánh giá rủi ro dòng tiền nóng tháo chạy (Carry Trade Unwind)."</div>
+        <div class="mission-text">"Nhiệm vụ: Phân tích 'Tác động kép' của tỷ giá: (1) Khủng hoảng Nợ công (Bài học 1997) và (2) Rủi ro dòng tiền nóng (Carry Trade Unwind)."</div>
     </div>
     """, unsafe_allow_html=True)
     
-    # Tạo 2 Tab: Nợ công & Đầu cơ (Carry Trade)
-    tab_debt, tab_carry = st.tabs(["📉 Gánh nặng Nợ công", "💸 Chiến lược Carry Trade"])
+    # Tạo 2 Tab
+    tab_debt, tab_carry = st.tabs(["📉 Khủng hoảng Nợ công & Bài học 1997", "💸 Chiến lược Carry Trade"])
 
-    # --- TAB 1: QUẢN LÝ NỢ CÔNG (IMPROVED) ---
+    # ==========================================================================
+    # TAB 1: NỢ CÔNG & BÀI HỌC 1997
+    # ==========================================================================
     with tab_debt:
         st.subheader("1. Mô phỏng Cú sốc Tỷ giá lên Nợ công")
         
         col_macro1, col_macro2 = st.columns(2)
         with col_macro1:
-            debt_val = st.number_input("Tổng nợ nước ngoài (Tỷ USD):", value=50.0, step=1.0)
+            debt_val = st.number_input("Tổng nợ nước ngoài (Tỷ USD):", value=50.0, step=1.0, help="Số tiền quốc gia vay bằng ngoại tệ (USD)")
             base_rate = st.number_input("Tỷ giá hiện tại (VND/USD):", value=25000.0, step=100.0)
         
         with col_macro2:
             st.markdown("#### Kịch bản Tỷ giá")
-            shock_pct = st.slider("Đồng nội tệ mất giá bao nhiêu %?", min_value=0.0, max_value=50.0, value=10.0, step=0.5)
+            shock_pct = st.slider("Đồng nội tệ mất giá bao nhiêu %?", min_value=0.0, max_value=100.0, value=20.0, step=1.0, help="Ví dụ: Năm 1997, đồng Baht Thái mất giá hơn 50% chỉ trong vài tháng.")
             
-        # Tính toán
+        # --- TÍNH TOÁN ---
         new_rate = base_rate * (1 + shock_pct/100)
-        base_debt_vnd = debt_val * base_rate # Tỷ VND
-        new_debt_vnd = debt_val * new_rate   # Tỷ VND
+        base_debt_vnd = debt_val * base_rate 
+        new_debt_vnd = debt_val * new_rate   
         loss_vnd = new_debt_vnd - base_debt_vnd
         
         st.markdown("---")
         
-        # Hiển thị kết quả Metric
+        # HIỂN THỊ KẾT QUẢ METRIC
         m1, m2, m3 = st.columns(3)
         m1.metric("Tỷ giá sau cú sốc", f"{new_rate:,.0f} VND", f"-{shock_pct}% (Mất giá)", delta_color="inverse")
-        m2.metric("Quy mô nợ (Quy đổi)", f"{new_debt_vnd:,.0f} Tỷ VND")
-        m3.metric("Gánh nặng tăng thêm", f"{loss_vnd:,.0f} Tỷ VND", delta="RỦI RO TÀI KHÓA", delta_color="inverse")
+        m2.metric("Nợ quy đổi ban đầu", f"{base_debt_vnd:,.0f} Tỷ VND")
+        m3.metric("Gánh nặng TĂNG THÊM", f"{loss_vnd:,.0f} Tỷ VND", delta="RỦI RO VỠ NỢ", delta_color="inverse")
 
-        # Giải thích động (Dynamic Logic)
-        if shock_pct > 20:
-            st.warning(f"⚠️ **CẢNH BÁO KHỦNG HOẢNG:** Mức mất giá **{shock_pct}%** là cực kỳ nghiêm trọng. Gánh nặng nợ tăng thêm **{loss_vnd/1000:,.1f} nghìn tỷ VND** có thể gây vỡ nợ quốc gia (Sovereign Default) hoặc buộc chính phủ phải thắt lưng buộc bụng.")
-        elif shock_pct > 0:
-            st.info(f"💡 **Phân tích:** Đồng tiền mất giá làm tăng giá trị nghĩa vụ nợ. Chính phủ cần trích thêm **{loss_vnd:,.0f} tỷ VND** từ ngân sách chỉ để trả phần chênh lệch tỷ giá này.")
-        else:
-            st.success("✅ Tỷ giá ổn định, không phát sinh gánh nặng nợ thêm.")
+        # Cảnh báo động
+        if shock_pct > 30:
+            st.error(f"🚨 **BÁO ĐỘNG ĐỎ:** Mức mất giá {shock_pct}% tương đương kịch bản Khủng hoảng Châu Á 1997. Nguy cơ vỡ nợ quốc gia (Sovereign Default) là rất cao.")
+        elif shock_pct > 10:
+            st.warning(f"⚠️ **Cảnh báo:** Gánh nặng nợ tăng thêm {loss_vnd/1000:,.1f} nghìn tỷ VND sẽ gây áp lực cực lớn lên ngân sách.")
 
-        # Context cho AI (Tab 1)
+        # --- [NEW] GIẢI THÍCH CÔNG THỨC CHI TIẾT (NỢ CÔNG) ---
+        with st.expander("🧮 GÓC HỌC TẬP: GIẢI MÃ SỐ LIỆU NỢ CÔNG", expanded=True):
+            st.markdown("#### 1. Tại sao Nợ lại tăng dù không vay thêm?")
+            st.write("Nợ gốc tính bằng USD vẫn giữ nguyên, nhưng số tiền VND phải bỏ ra để mua USD trả nợ tăng lên do tỷ giá tăng.")
+            
+            st.markdown("#### 2. Công thức tính toán cụ thể:")
+            st.markdown(f"""
+            * **Nợ quy đổi ban đầu:** $${debt_val} \\text{{ (Tỷ USD)}} \\times {base_rate:,.0f} \\text{{ (Tỷ giá cũ)}} = \\mathbf{{{base_debt_vnd:,.0f} \\text{{ Tỷ VND}}}}$$
+            
+            * **Nợ sau khi mất giá:** $${debt_val} \\text{{ (Tỷ USD)}} \\times {new_rate:,.0f} \\text{{ (Tỷ giá mới)}} = \\mathbf{{{new_debt_vnd:,.0f} \\text{{ Tỷ VND}}}}$$
+            
+            * **Gánh nặng tăng thêm (Thiệt hại):**
+                $${new_debt_vnd:,.0f} - {base_debt_vnd:,.0f} = \\mathbf{{{loss_vnd:,.0f} \\text{{ Tỷ VND}}}}$$
+            """)
+
+        # --- PHẦN MINH HỌA LỊCH SỬ ---
+        with st.expander("📚 BÀI HỌC LỊCH SỬ: KHỦNG HOẢNG TÀI CHÍNH 1997"):
+            c_hist1, c_hist2 = st.columns([1, 2])
+            with c_hist1:
+                st.write("### 📉")
+                st.caption("**Đồng Baht Thái sụp đổ**")
+                # Kích hoạt tìm kiếm hình ảnh biểu đồ khủng hoảng
+                st.markdown("")
+            
+            with c_hist2:
+                st.write("""
+                **Nguyên nhân sụp đổ:**
+                Vào năm 1997, Thái Lan vay nợ nước ngoài rất lớn (giống ví dụ trên). Khi đồng Baht mất giá 50%, gánh nặng nợ quy đổi tăng gấp đôi, khiến các công ty không thể trả nợ và phá sản hàng loạt.
+                """)
+
         macro_context = f"""
-        Tình huống: Quốc gia có {debt_val} tỷ USD nợ nước ngoài.
-        Tỷ giá mất giá: {shock_pct}%.
-        Thiệt hại tài chính: Tăng thêm {loss_vnd:,.0f} tỷ VND nợ quy đổi.
+        Quốc gia nợ {debt_val} tỷ USD. Tỷ giá mất giá {shock_pct}%.
+        Gánh nặng nợ tăng thêm {loss_vnd:,.0f} tỷ VND.
+        So sánh với kịch bản khủng hoảng 1997.
         """
 
-    # --- TAB 2: CARRY TRADE (MỚI HOÀN TOÀN) ---
+    # ==========================================================================
+    # TAB 2: CARRY TRADE STRATEGY (ĐÃ CHỈNH SỬA HIỂN THỊ)
+    # ==========================================================================
     with tab_carry:
         st.subheader("2. Đầu cơ Chênh lệch lãi suất (Carry Trade)")
-        st.caption("Nguyên lý: Vay đồng tiền lãi suất thấp (Funding Currency) -> Đầu tư vào đồng tiền lãi suất cao (Target Currency).")
+        st.caption("Chiến lược: Vay đồng tiền lãi thấp (Funding Ccy) -> Mua đồng tiền lãi cao (Target Ccy).")
         
+        # Kích hoạt tìm kiếm hình ảnh minh họa cơ chế Carry Trade
+        st.markdown("")
+
         c1, c2 = st.columns(2)
         with c1:
             capital = st.number_input("Vốn đầu tư (Triệu USD):", value=10.0, step=1.0)
-            rate_borrow = st.number_input("Lãi suất đồng tiền đi vay (VD: JPY):", value=0.5, step=0.1, format="%.1f")
-            st.caption("Ví dụ: Yên Nhật (JPY) thường có lãi suất thấp.")
+            rate_borrow = st.number_input("Lãi vay (Funding Rate %):", value=0.5, step=0.1, help="Ví dụ: Lãi suất JPY (Yên Nhật)")
             
         with c2:
-            rate_invest = st.number_input("Lãi suất đồng tiền đầu tư (VD: USD/VND):", value=5.5, step=0.1, format="%.1f")
-            fx_move = st.slider("Biến động tỷ giá đồng tiền đầu tư (%):", min_value=-10.0, max_value=10.0, value=-2.0, step=0.5)
-            st.caption("Dương (+) = Tăng giá (Lời thêm) | Âm (-) = Giảm giá (Lỗ tỷ giá).")
+            rate_invest = st.number_input("Lãi đầu tư (Target Rate %):", value=5.5, step=0.1, help="Ví dụ: Lãi suất USD hoặc VND")
+            fx_move = st.slider("Biến động tỷ giá (%):", -10.0, 10.0, -2.0, 0.5, help="Dương: Đồng tiền đầu tư tăng giá (Lời). Âm: Đồng tiền đầu tư giảm giá (Lỗ).")
 
         st.markdown("---")
         
-        # Tính toán Carry Trade
-        # 1. Lời từ chênh lệch lãi suất (Interest Differential)
-        interest_diff_pct = rate_invest - rate_borrow
-        interest_profit = capital * (interest_diff_pct / 100)
+        # TÍNH TOÁN
+        interest_diff = rate_invest - rate_borrow
+        profit_interest = capital * (interest_diff / 100)
+        profit_fx = capital * (fx_move / 100)
+        total_pnl = profit_interest + profit_fx
+        roi = (total_pnl / capital) * 100
         
-        # 2. Lời/Lỗ từ tỷ giá (FX Gain/Loss)
-        fx_profit = capital * (fx_move / 100)
-        
-        # 3. Tổng kết
-        total_pnl = interest_profit + fx_profit
-        total_roi = (total_pnl / capital) * 100
-        
-        # Hiển thị
-        col_res1, col_res2, col_res3 = st.columns(3)
-        col_res1.metric("1. Lợi nhuận từ Lãi suất", f"{interest_profit:+,.2f} M$", f"Spread: {interest_diff_pct:.1f}%")
-        col_res2.metric("2. Lợi nhuận từ Tỷ giá", f"{fx_profit:+,.2f} M$", f"FX Change: {fx_move}%")
-        col_res3.metric("3. TỔNG LÃI/LỖ THỰC TẾ", f"{total_pnl:+,.2f} M$", f"ROI: {total_roi:.2f}%", delta_color="normal")
+        # HIỂN THỊ KẾT QUẢ
+        c_res1, c_res2, c_res3 = st.columns(3)
+        c_res1.metric("1. Lãi từ Lãi suất (Spread)", f"${profit_interest:,.2f} M", f"Chênh lệch: {interest_diff:.1f}%")
+        c_res2.metric("2. Lãi/Lỗ từ Tỷ giá (FX)", f"${profit_fx:,.2f} M", f"Biến động: {fx_move}%")
+        c_res3.metric("3. TỔNG LỢI NHUẬN", f"${total_pnl:,.2f} M", f"ROI: {roi:.1f}%", delta_color="normal")
 
-        # Logic giải thích động Carry Trade
-        carry_msg = ""
-        if total_pnl > 0:
-            if fx_move < 0:
-                carry_msg = f"😅 **HÚ VÍA:** Bạn bị lỗ tỷ giá ({fx_move}%), nhưng nhờ chênh lệch lãi suất cao ({interest_diff_pct:.1f}%) nên tổng thể vẫn **CÓ LÃI**. Đây là 'ăn ít đi để an toàn'."
-            else:
-                carry_msg = "🚀 **THẮNG LỚN (Double Win):** Bạn ăn trọn cả 'chênh lệch lãi suất' lẫn 'đồng tiền lên giá'. Kịch bản trong mơ của mọi quỹ đầu cơ!"
-        elif total_pnl < 0:
-            if interest_diff_pct > 0:
-                carry_msg = f"💀 **CARRY TRADE UNWIND:** Dù lãi suất đầu tư cao hơn vay ({interest_diff_pct:.1f}%), nhưng đồng tiền đầu tư rớt giá quá mạnh ({fx_move}%) đã **THỔI BAY** toàn bộ lợi nhuận. Đây là rủi ro 'lượm bạc cắc, mất tiền cọc'."
-            else:
-                carry_msg = "📉 **Quyết định sai lầm:** Vay lãi cao đầu tư lãi thấp, lại còn lỗ tỷ giá. Thua lỗ kép."
-        
-        st.info(carry_msg)
-        
-        # Context cho AI (Tab 2)
+        # --- [UPDATED] GIẢI THÍCH CÔNG THỨC CHI TIẾT ---
+        with st.expander("🧮 GÓC HỌC TẬP: GIẢI MÃ CÁCH TÍNH CARRY TRADE", expanded=True):
+            st.markdown("Tổng lợi nhuận đến từ 2 nguồn riêng biệt:")
+            
+            st.markdown("#### A. Lợi nhuận từ Lãi suất (Interest Profit)")
+            st.latex(r"\text{Profit}_{\text{Rate}} = \text{Vốn} \times (\text{Lãi}_{\text{Đầu tư}} - \text{Lãi}_{\text{Vay}})")
+            # Sử dụng markdown thuần túy để tránh lỗi hiển thị ký tự đặc biệt
+            st.markdown(f"""
+            👉 **Áp dụng:** {capital} Triệu USD × ({rate_invest}% - {rate_borrow}%) = **{profit_interest:,.2f} Triệu USD** *(Đây là phần lợi nhuận "chắc ăn" nếu tỷ giá không đổi)*
+            """)
+            
+            st.divider()
+            
+            st.markdown("#### B. Lợi nhuận từ Tỷ giá (FX Profit/Loss)")
+            st.latex(r"\text{Profit}_{\text{FX}} = \text{Vốn} \times \% \text{Biến động Tỷ giá}")
+            st.markdown(f"""
+            👉 **Áp dụng:** {capital} Triệu USD × {fx_move}% = **{profit_fx:,.2f} Triệu USD**
+            """)
+            
+            st.info("""
+            **Quy luật cốt lõi:** Carry Trade giống như việc **"nhặt tiền lẻ (Lãi suất) trước đầu xe lu (Tỷ giá)"**. 
+            Bạn có thể kiếm được lợi nhuận nhỏ đều đặn từ lãi suất, nhưng một cú trượt giá bất ngờ (xe lu) có thể xóa sạch thành quả.
+            """)
+
         carry_context = f"""
-        Chiến lược Carry Trade:
-        - Vốn: {capital} triệu USD.
-        - Chênh lệch lãi suất (Interest Spread): {interest_diff_pct:.1f}% (Lợi thế).
-        - Biến động tỷ giá (FX Move): {fx_move}% (Tác động).
-        - Kết quả cuối cùng: {'LÃI' if total_pnl > 0 else 'LỖ'} {total_pnl:.2f} triệu USD.
+        Chiến lược Carry Trade: Capital {capital}M. Interest Spread {interest_diff}%. FX Move {fx_move}%.
+        Kết quả: {'LÃI' if total_pnl > 0 else 'LỖ'} {total_pnl:.2f}M USD.
         """
 
-    # --- NÚT HỎI AI CHUNG CHO CẢ PHÒNG ---
+    # --- AI ADVISOR (ĐỘNG) ---
     st.markdown("---")
-    if st.button("Hỏi AI Chuyên gia: Phân tích Rủi ro & Cơ hội", type="primary", icon="🤖"):
+    if st.button("AI Chuyên gia: Phân tích Rủi ro & Xu hướng", type="primary", icon="🤖"):
         if api_key:
-            # Xác định user đang xem tab nào để gửi context đó (đơn giản hóa thì gửi cả 2 hoặc cái nào đang active)
-            # Ở đây ta gửi context kết hợp
+            # Gộp ngữ cảnh cả 2 Tab
             full_context = f"""
-            TÔI ĐANG CÓ 2 KỊCH BẢN VĨ MÔ:
-            
-            KỊCH BẢN 1 (NỢ CÔNG):
-            {macro_context}
-            
-            KỊCH BẢN 2 (CARRY TRADE STRATEGY):
-            {carry_context}
+            TÌNH HUỐNG MÔ PHỎNG:
+            1. [Nợ công] Quốc gia đang chịu áp lực tỷ giá mất {shock_pct}%, nợ tăng thêm {loss_vnd:,.0f} tỷ VND.
+            2. [Carry Trade] Nhà đầu cơ đang { 'lãi' if total_pnl > 0 else 'lỗ' } với ROI {roi:.1f}% (Spread {interest_diff}%, FX {fx_move}%).
             """
             
-            task = "Với vai trò Giám đốc Chiến lược (Macro Strategist), hãy phân tích rủi ro của từng kịch bản. Với Carry Trade, hãy giải thích tại sao 'Lượm bạc cắc (lãi suất) có thể mất tiền cọc (tỷ giá)'?"
+            task = """
+            Đóng vai Giám đốc Chiến lược (Macro Strategist). Hãy thực hiện báo cáo nhanh:
+            1.  **So sánh thực tế:** Liên hệ tình huống Carry Trade trên với sự kiện "Yên Nhật (JPY) Unwind" năm 2024. Tại sao khi đồng JPY tăng giá, thị trường chứng khoán toàn cầu lại chao đảo?
+            2.  **Đánh giá rủi ro Nợ công:** Với mức mất giá {shock_pct}% của kịch bản 1, liệu quốc gia này có lặp lại vết xe đổ Thái Lan 1997 không?
+            3.  **Lời khuyên:** Nhà đầu tư nên "Risk On" (Chấp nhận rủi ro) hay "Risk Off" (Trú ẩn an toàn) lúc này?
+            """
             
-            with st.spinner("Đang phân tích dữ liệu vĩ mô..."):
-                analysis = ask_gemini_advisor("Macro Strategist", full_context, task)
-                st.markdown(f'<div class="ai-box"><h4>🤖 PHÂN TÍCH CHIẾN LƯỢC</h4>{analysis}</div>', unsafe_allow_html=True)
+            with st.spinner("Đang kết nối dữ liệu vĩ mô toàn cầu..."):
+                advise = ask_gemini_advisor("Macro Strategist", full_context, task)
+                st.markdown(f'<div class="ai-box"><h4>🤖 BÁO CÁO CHIẾN LƯỢC TOÀN CẦU</h4>{advise}</div>', unsafe_allow_html=True)
         else:
             st.warning("⚠️ Vui lòng nhập API Key.")
     

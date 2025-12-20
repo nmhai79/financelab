@@ -333,7 +333,10 @@ if "1." in room:
         with k2: bank_b = st.number_input("Bank B (EUR/USD):", value=1.1000, help="Giá bán EUR lấy USD")
         with k3: bank_c = st.number_input("Bank C (EUR/VND):", value=28000.0, help="Giá bán EUR lấy VND")
         
-        # --- TÍNH TOÁN LOGIC (Tách ra để dùng chung cho cả Hiển thị và AI) ---
+        # --- TÍNH TOÁN LOGIC ---
+        # Tính tỷ giá cân bằng lý thuyết (No Arbitrage Rate) để làm gợi ý
+        fair_rate_c = bank_a * bank_b
+
         # Cách 1: USD -> EUR -> VND -> USD
         path1_eur = capital / bank_b
         path1_vnd = path1_eur * bank_c
@@ -346,22 +349,14 @@ if "1." in room:
         path2_usd_final = path2_eur * bank_b
         profit2 = path2_usd_final - capital
 
-        # Xác định phương án tốt nhất để hiển thị và gửi cho AI
-        best_profit = max(profit1, profit2)
-        if profit1 > profit2:
-            best_direction = "Chiều xuôi: USD -> EUR -> VND -> USD"
-        else:
-            best_direction = "Chiều ngược: USD -> VND -> EUR -> USD"
-
         # --- NÚT CHẠY MÔ HÌNH HIỂN THỊ ---
         if st.button("🚀 KÍCH HOẠT THUẬT TOÁN ARBITRAGE"):
             st.markdown("### 📝 Nhật ký giao dịch tối ưu:")
             
-            if profit1 > 0:
-                # Hiển thị Cách 1
-                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Mua EUR (Bank B) -> Bán lấy VND (Bank C)")
+            if profit1 > 1.0: # Dùng > 1.0 để tránh lỗi làm tròn số cực nhỏ
+                # Hiển thị Cách 1: B -> C -> A
+                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Mua EUR (Bank B) ➔ Bán tại Bank C ➔ Đổi về Bank A")
                 
-                # Dùng text-align left và margin để đảm bảo hiển thị đẹp
                 st.markdown(f"""
                 <div class="step-box">
                 1. <b>Dùng USD mua EUR (tại Bank B):</b><br>
@@ -374,10 +369,13 @@ if "1." in room:
                 """, unsafe_allow_html=True)
                 
                 st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit1:,.2f} USD</div>', unsafe_allow_html=True)
+                
+                # [GỢI Ý]
+                st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
 
-            elif profit2 > 0:
-                # Hiển thị Cách 2
-                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Bán USD (Bank A) -> Mua EUR (Bank C)")
+            elif profit2 > 1.0:
+                # Hiển thị Cách 2: A -> C -> B
+                st.success(f"✅ PHÁT HIỆN CƠ HỘI: Đổi VND (Bank A) ➔ Mua EUR (Bank C) ➔ Bán tại Bank B")
                 
                 st.markdown(f"""
                 <div class="step-box">
@@ -392,25 +390,27 @@ if "1." in room:
                 
                 st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit2:,.2f} USD</div>', unsafe_allow_html=True)
                 
+                # [GỢI Ý]
+                st.info(f"💡 **Gợi ý:** Để thị trường cân bằng (hết lời), hãy thử chỉnh **Bank C** về **{fair_rate_c:,.0f}** (tức là {bank_a} × {bank_b}).")
+                
             else:
-                st.warning("⚖️ Thị trường cân bằng (No Arbitrage). Cả 2 chiều giao dịch đều không sinh lời hoặc lỗ phí.")
-                st.info("Gợi ý: Hãy thử chỉnh chênh lệch giá giữa Bank B (Quốc tế) và Bank C (Việt Nam) lớn hơn.")
+                st.balloons()
+                st.warning("⚖️ Thị trường cân bằng (No Arbitrage). Cả 2 chiều giao dịch đều không sinh lời.")
+                # Khi đã cân bằng thì hiện thông báo khen ngợi
+                st.success(f"👏 Xuất sắc! Bạn đã tìm ra tỷ giá cân bằng: {bank_c:,.0f} ≈ {bank_a} × {bank_b}")
 
             # Giải thích chung
             with st.expander("🎓 BẢN CHẤT: Tại sao có tiền lời?"):
                 st.markdown("""
-                **Nguyên lý:** Mua ở nơi giá thấp, bán ở nơi giá cao (Buy Low, Sell High).
+                **Nguyên lý:** Arbitrage tam giác (Triangular Arbitrage).
                 
-                Máy tính đã tự động so sánh hai con đường:
-                * **Vòng 1 (Chiều xuôi):** Mua EUR quốc tế đem về VN bán.
-                * **Vòng 2 (Chiều ngược):** Mua EUR ở VN đem ra quốc tế bán.
+                Máy tính đã tự động so sánh hai con đường vòng quanh 3 ngân hàng:
+                * **Vòng 1 (Chiều xuôi):** USD ➔ EUR (Bank B) ➔ VND (Bank C) ➔ USD (Bank A).
+                * **Vòng 2 (Chiều ngược):** USD ➔ VND (Bank A) ➔ EUR (Bank C) ➔ USD (Bank B).
                 
-                Nếu chênh lệch giá đủ lớn (lớn hơn phí giao dịch), lợi nhuận phi rủi ro sẽ xuất hiện. Đây chính là cơ chế giúp tỷ giá toàn cầu cân bằng.
+                Nếu chênh lệch giá đủ lớn, dòng tiền đi một vòng sẽ "đẻ" ra tiền lời.
                 """)
-                # Diagram minh họa tam giác tỷ giá
-                st.write("") 
-
-            import streamlit as st
+                st.write("")          
         
         # --- [MỚI] THÊM DÒNG NÀY ĐỂ TẠO KHUNG BAO QUANH ---
         with st.container(border=True):
@@ -1170,141 +1170,175 @@ elif "3." in room:
 # ==============================================================================
 # PHÒNG 4: ĐẦU TƯ QUỐC TẾ
 # ==============================================================================
+# ==============================================================================
+# PHÒNG 4: ĐẦU TƯ QUỐC TẾ (UPDATED WITH IRR & CONCLUSION)
+# ==============================================================================
 elif "4." in room:
-            st.markdown('<p class="header-style">🏭 Phòng Đầu tư Quốc tế (Investment Dept)</p>', unsafe_allow_html=True)
+    # --- IMPORT THƯ VIỆN TÀI CHÍNH (Xử lý trường hợp chưa cài đặt) ---
+    try:
+        import numpy_financial as npf
+    except ImportError:
+        st.error("⚠️ Thư viện 'numpy_financial' chưa được cài đặt. Vui lòng chạy `pip install numpy-financial` để tính IRR.")
+        import numpy as npf # Fallback (có thể warning trên các bản numpy mới)
+
+    st.markdown('<p class="header-style">🏭 Phòng Đầu tư Quốc tế (Investment Dept)</p>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="role-card">
+        <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư (Investment Analyst)</div>
+        <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI, Tính toán IRR/NPV và Đánh giá rủi ro tỷ giá."</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # --- 1. INPUTS ---
+    with st.expander("📝 THÔNG SỐ DỰ ÁN ĐẦU TƯ", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("##### 1. Dòng tiền Dự án (USD)")
+            inv = st.number_input("Vốn đầu tư ban đầu (CapEx):", value=1000000.0, step=10000.0, format="%.0f")
+            cf_yearly = st.number_input("Dòng tiền ròng hằng năm (Operating CF):", value=300000.0, step=5000.0, format="%.0f")
+            salvage_val = st.number_input("Giá trị thanh lý cuối kỳ (Terminal Value):", value=200000.0, help="Tiền bán thanh lý tài sản khi kết thúc dự án")
+            years = st.slider("Vòng đời dự án (năm):", 3, 10, 5)
             
-            st.markdown("""
-            <div class="role-card">
-                <div class="role-title">👤 Vai diễn: Chuyên viên Phân tích Đầu tư (Investment Analyst)</div>
-                <div class="mission-text">"Nhiệm vụ: Thẩm định dự án FDI, Phân tích độ nhạy (Sensitivity Analysis) và Đánh giá rủi ro tỷ giá."</div>
-            </div>
-            """, unsafe_allow_html=True)
+        with c2:
+            st.markdown("##### 2. Thị trường & Vĩ mô")
+            fx_spot = st.number_input("Tỷ giá Spot hiện tại (VND/USD):", value=25000.0, step=10.0)
+            depre = st.number_input("Mức độ mất giá VND (%/năm):", value=3.0, step=0.1, help="Dự báo VND mất giá bao nhiêu % so với USD mỗi năm")
+            wacc = st.number_input("Chi phí vốn (WACC %):", value=12.0, step=0.5, help="Tỷ suất sinh lời yêu cầu của nhà đầu tư (Hurdle Rate)")
             
-            # --- 1. INPUTS ---
-            with st.expander("📝 THÔNG SỐ DỰ ÁN ĐẦU TƯ", expanded=True):
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown("##### 1. Dòng tiền Dự án (USD)")
-                    inv = st.number_input("Vốn đầu tư ban đầu (CapEx):", value=1000000.0, step=10000.0, format="%.0f")
-                    cf_yearly = st.number_input("Dòng tiền ròng hằng năm (Operating CF):", value=300000.0, step=5000.0, format="%.0f")
-                    salvage_val = st.number_input("Giá trị thanh lý cuối kỳ (Terminal Value):", value=200000.0, help="Tiền bán thanh lý tài sản khi kết thúc dự án")
-                    years = st.slider("Vòng đời dự án (năm):", 3, 10, 5)
-                    
-                with c2:
-                    st.markdown("##### 2. Thị trường & Vĩ mô")
-                    fx_spot = st.number_input("Tỷ giá Spot hiện tại (VND/USD):", value=25000.0, step=10.0)
-                    depre = st.number_input("Mức độ mất giá VND (%/năm):", value=3.0, step=0.1, help="Dự báo VND mất giá bao nhiêu % so với USD mỗi năm")
-                    wacc = st.number_input("Chi phí vốn (WACC %):", value=12.0, step=0.5, help="Tỷ suất sinh lời yêu cầu của nhà đầu tư")
-                    
-            st.markdown("---")
+    st.markdown("---")
 
-            # --- 2. TÍNH TOÁN & HIỂN THỊ ---
-            if st.button("📊 CHẠY MÔ HÌNH DCF & PHÂN TÍCH ĐỘ NHẠY"):
-                
-                # A. TÍNH DÒNG TIỀN CƠ SỞ (BASE CASE)
-                # -----------------------------------
-                data_cf = []
-                cumulative_pv = 0
-                payback_period = None
-                
-                # Năm 0
-                cf0_vnd = -inv * fx_spot
-                cumulative_pv += cf0_vnd
-                data_cf.append({
-                    "Năm": 0, 
-                    "Tỷ giá (VND/USD)": fx_spot, 
-                    "CF (USD)": -inv, 
-                    "CF Quy đổi (VND)": cf0_vnd, 
-                    "PV (Hiện giá VND)": cf0_vnd, 
-                    "Lũy kế PV": cumulative_pv
-                })
-                
-                # Năm 1 -> n
-                for i in range(1, years + 1):
-                    # Tính tỷ giá tương lai: S_t = S_0 * (1 + delta)^t
-                    fx_future = fx_spot * ((1 + depre/100) ** i)
-                    
-                    # Tính dòng tiền USD: Operating CF + Terminal Value (nếu là năm cuối)
-                    cf_usd = cf_yearly + (salvage_val if i == years else 0)
-                    
-                    # Quy đổi VND: CF_VND = CF_USD * S_t
-                    cf_vnd = cf_usd * fx_future
-                    
-                    # Chiết khấu: PV = CF_VND / (1 + WACC)^t
-                    pv_vnd = cf_vnd / ((1 + wacc/100) ** i)
-                    
-                    # Lưu lại giá trị lũy kế cũ để tính Payback Period
-                    prev_cumulative = cumulative_pv
-                    cumulative_pv += pv_vnd
-                    
-                    # Check thời gian hoàn vốn (Lần đầu tiên Lũy kế chuyển từ Âm sang Dương)
-                    if payback_period is None and cumulative_pv >= 0:
-                        # Công thức nội suy: Năm trước + (Số tiền còn thiếu / Dòng tiền năm nay)
-                        fraction = abs(prev_cumulative) / pv_vnd
-                        payback_period = (i - 1) + fraction
-                    
-                    data_cf.append({
-                        "Năm": i, 
-                        "Tỷ giá (VND/USD)": fx_future, 
-                        "CF (USD)": cf_usd, 
-                        "CF Quy đổi (VND)": cf_vnd, 
-                        "PV (Hiện giá VND)": pv_vnd, 
-                        "Lũy kế PV": cumulative_pv
-                    })
-                    
-                npv = cumulative_pv # NPV chính là Lũy kế năm cuối cùng
-                
-                # B. HIỂN THỊ KẾT QUẢ
-                # -----------------------------------
-                st.subheader("1. Kết quả Thẩm định")
-                
-                m1, m2, m3 = st.columns(3)
-                m1.metric("NPV (Giá trị hiện tại ròng)", f"{npv:,.0f} VND", 
-                         delta="Đáng đầu tư" if npv > 0 else "Không nên đầu tư")
-                
-                if payback_period:
-                    m2.metric("Thời gian hoàn vốn (DPP)", f"{payback_period:.2f} Năm")
-                else:
-                    m2.metric("Thời gian hoàn vốn", "Chưa hoàn vốn", delta_color="inverse")
-                    
-                roi = (npv / abs(cf0_vnd)) * 100
-                m3.metric("ROI (Tỷ suất sinh lời)", f"{roi:.2f}%", help="=(NPV / Vốn đầu tư ban đầu) * 100")
+    # --- 2. TÍNH TOÁN & HIỂN THỊ ---
+    if st.button("📊 CHẠY MÔ HÌNH DCF & PHÂN TÍCH ĐỘ NHẠY"):
+        
+        # A. TÍNH DÒNG TIỀN CƠ SỞ (BASE CASE)
+        # -----------------------------------
+        data_cf = []
+        cf_stream_vnd_nominal = [] # Dòng tiền danh nghĩa (chưa chiết khấu) để tính IRR
+        cumulative_pv = 0
+        payback_period = None
+        
+        # Năm 0
+        cf0_vnd = -inv * fx_spot
+        cumulative_pv += cf0_vnd
+        cf_stream_vnd_nominal.append(cf0_vnd) # Thêm vào stream tính IRR
+        
+        data_cf.append({
+            "Năm": 0, 
+            "Tỷ giá (VND/USD)": fx_spot, 
+            "CF (USD)": -inv, 
+            "CF Quy đổi (VND)": cf0_vnd, 
+            "PV (Hiện giá VND)": cf0_vnd, 
+            "Lũy kế PV": cumulative_pv
+        })
+        
+        # Năm 1 -> n
+        for i in range(1, years + 1):
+            # Tính tỷ giá tương lai: S_t = S_0 * (1 + delta)^t
+            fx_future = fx_spot * ((1 + depre/100) ** i)
+            
+            # Tính dòng tiền USD: Operating CF + Terminal Value (nếu là năm cuối)
+            cf_usd = cf_yearly + (salvage_val if i == years else 0)
+            
+            # Quy đổi VND: CF_VND = CF_USD * S_t
+            cf_vnd = cf_usd * fx_future
+            cf_stream_vnd_nominal.append(cf_vnd) # Thêm vào stream tính IRR
+            
+            # Chiết khấu: PV = CF_VND / (1 + WACC)^t
+            pv_vnd = cf_vnd / ((1 + wacc/100) ** i)
+            
+            # Lưu lại giá trị lũy kế cũ để tính Payback Period
+            prev_cumulative = cumulative_pv
+            cumulative_pv += pv_vnd
+            
+            # Check thời gian hoàn vốn (Lần đầu tiên Lũy kế chuyển từ Âm sang Dương)
+            if payback_period is None and cumulative_pv >= 0:
+                # Công thức nội suy: Năm trước + (Số tiền còn thiếu / Dòng tiền năm nay)
+                fraction = abs(prev_cumulative) / pv_vnd
+                payback_period = (i - 1) + fraction
+            
+            data_cf.append({
+                "Năm": i, 
+                "Tỷ giá (VND/USD)": fx_future, 
+                "CF (USD)": cf_usd, 
+                "CF Quy đổi (VND)": cf_vnd, 
+                "PV (Hiện giá VND)": pv_vnd, 
+                "Lũy kế PV": cumulative_pv
+            })
+            
+        npv = cumulative_pv # NPV chính là Lũy kế năm cuối cùng
+        
+        # Tính IRR (Internal Rate of Return)
+        try:
+            irr_value = npf.irr(cf_stream_vnd_nominal) * 100
+        except:
+            irr_value = 0 # Xử lý lỗi nếu dòng tiền không hội tụ
+        
+        # B. HIỂN THỊ KẾT QUẢ
+        # -----------------------------------
+        st.subheader("1. Kết quả Thẩm định")
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("NPV (Giá trị hiện tại ròng)", f"{npv:,.0f} VND", 
+                 delta="Đáng đầu tư" if npv > 0 else "Lỗ vốn")
+        
+        if payback_period:
+            m2.metric("Thời gian hoàn vốn (DPP)", f"{payback_period:.2f} Năm")
+        else:
+            m2.metric("Thời gian hoàn vốn", "Chưa hoàn vốn", delta_color="inverse")
+            
+        # [UPDATED] Hiển thị IRR thay vì ROI
+        m3.metric("IRR (Hoàn vốn nội bộ)", f"{irr_value:.2f}%", 
+                  help="Tỷ suất sinh lời thực tế. So sánh với WACC.",
+                  delta=f"WACC: {wacc}%", delta_color="normal") # Hiển thị WACC nhỏ bên dưới để so sánh
 
-                # Biểu đồ kết hợp
-                df_chart = pd.DataFrame(data_cf)
-                st.bar_chart(df_chart.set_index("Năm")[["PV (Hiện giá VND)"]], color="#4B4BFF")
-                
-                with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
-                    st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
+        # --- [NEW] KẾT LUẬN TỰ ĐỘNG ---
+        # Logic: NPV > 0 VÀ IRR > WACC => Nên đầu tư
+        is_feasible = (npv > 0) and (irr_value > wacc)
+        
+        if is_feasible:
+            st.success(f"✅ KẾT LUẬN: NÊN ĐẦU TƯ. Dự án tạo ra lợi nhuận ròng dương ({npv:,.0f} VND) và Tỷ suất sinh lời ({irr_value:.2f}%) cao hơn chi phí vốn ({wacc}%).")
+        else:
+            reason = []
+            if npv <= 0: reason.append("NPV âm")
+            if irr_value <= wacc: reason.append(f"IRR ({irr_value:.2f}%) thấp hơn lãi suất yêu cầu ({wacc}%)")
+            st.error(f"⛔ KẾT LUẬN: KHÔNG NÊN ĐẦU TƯ. Lý do: {', '.join(reason)}.")
 
-                # --- [NEW] C. GIẢI THÍCH CÔNG THỨC (EDUCATIONAL PART) ---
-                # --------------------------------------------------------
-                with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC (READING MATERIAL)", expanded=True):
-                    st.markdown("#### 1. Công thức tính NPV Điều chỉnh Tỷ giá")
-                    st.markdown("Mô hình này khác NPV thông thường vì dòng tiền USD phải được quy đổi ra VND theo tỷ giá kỳ vọng từng năm trước khi chiết khấu.")
+        # Biểu đồ kết hợp
+        df_chart = pd.DataFrame(data_cf)
+        st.bar_chart(df_chart.set_index("Năm")[["PV (Hiện giá VND)"]], color="#4B4BFF")
+        
+        with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
+            st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
+
+        # --- [UPDATED] C. GIẢI THÍCH CÔNG THỨC (EDUCATIONAL PART) ---
+        # --------------------------------------------------------
+        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC (READING MATERIAL)", expanded=True):
+            st.markdown("#### 1. Công thức tính NPV Điều chỉnh Tỷ giá")
+            st.markdown("Mô hình này khác NPV thông thường vì dòng tiền USD phải được quy đổi ra VND theo tỷ giá kỳ vọng từng năm trước khi chiết khấu.")
                     
                     # FIX: Dùng \text{WACC} để chữ hiển thị liền nhau đẹp hơn
-                    st.latex(r"NPV = -I_0 \times S_0 + \sum_{t=1}^{n} \frac{(CF_{t, USD} + TV_n) \times S_t}{(1 + \text{WACC})^t}")
+            st.latex(r"NPV = -I_0 \times S_0 + \sum_{t=1}^{n} \frac{(CF_{t, USD} + TV_n) \times S_t}{(1 + \text{WACC})^t}")
                     
-                    st.markdown(f"""
+            st.markdown(f"""
                     **Trong đó:**
                     * $I_0$: Vốn đầu tư ban đầu ({inv:,.0f} USD).
                     * $CF_{{t, USD}}$: Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
                     * $TV_n$: Giá trị thanh lý năm cuối ({salvage_val:,.0f} USD).
-                    * $S_t$: Tỷ giá dự báo năm $t$, tính bằng: $S_0 \times (1 + {depre}\%)^t$.
+                    * $S_t$: Tỷ giá dự báo năm $t$, tính bằng: $S_0 \\times (1 + {depre}\%)^t$.
                     * $\\text{{WACC}}$: Chi phí vốn ({wacc}%).
                     """)
                     
-                    st.divider()
+            st.divider()
                     
                     # --- 2. CÔNG THỨC DPP (ĐÃ SỬA LỖI TRUY XUẤT DỮ LIỆU) ---
-                    st.markdown("#### 2. Công thức Thời gian hoàn vốn (DPP)")
+            st.markdown("#### 2. Công thức Thời gian hoàn vốn (DPP)")
                     
                     # A. Hiển thị công thức tổng quát
-                    st.latex(r"DPP = Y_{negative} + \frac{|PV_{Cumulative}|}{PV_{NextYear}}")
+            st.latex(r"DPP = Y_{negative} + \frac{|PV_{Cumulative}|}{PV_{NextYear}}")
                     
                     # B. Giải thích các tham số (Legend)
-                    st.markdown("""
+            st.markdown("""
                     **Trong đó:**
                     * $Y_{negative}$: Số năm mà dòng tiền lũy kế vẫn còn âm (Năm liền trước khi hoàn vốn).
                     * $|PV_{Cumulative}|$: Số vốn "còn thiếu" tại cuối năm $Y_{negative}$ (Lấy trị tuyệt đối).
@@ -1312,7 +1346,7 @@ elif "4." in room:
                     """)
 
                     # C. Ráp số liệu thực tế (Plug-in Values)
-                    if payback_period:
+            if payback_period:
                         y_neg_idx = int(payback_period) # Ví dụ: 4
                         
                         try:
@@ -1334,90 +1368,109 @@ elif "4." in room:
                         except Exception as e:
                             # Fallback nếu index vượt quá giới hạn (ít gặp)
                             st.warning(f"Đã tính được DPP ({payback_period:.2f} năm), nhưng không thể hiển thị chi tiết phép chia.")
-                    else:
+            else:
                         st.info("Dự án chưa hoàn vốn nên không thể áp dụng công thức chi tiết.")
 
-                    st.divider()
+            st.divider()
 
-                    # --- 3. PHÂN TÍCH ĐỘ NHẠY (GIỮ NGUYÊN) ---
-                    st.markdown("#### 3. Tại sao cần Phân tích Độ nhạy (Sensitivity)?")
-                    st.write("""
+            # --- [NEW] 3. CÔNG THỨC IRR ---
+            st.markdown("#### 3. Công thức Tỷ suất hoàn vốn nội bộ (IRR)")
+            st.markdown("""
+            **IRR (Internal Rate of Return)** là tỷ suất chiết khấu ($r$) mà tại đó **NPV = 0**. 
+            Nói cách khác, đó là mức lãi suất hòa vốn của dự án.
+            """)
+            st.latex(r"NPV = \sum_{t=0}^{n} \frac{CF_{t, VND}}{(1 + IRR)^t} = 0")
+            
+            st.markdown(f"""
+            **Quy tắc ra quyết định:**
+            * Nếu **IRR > WACC ({wacc}%)** $\\rightarrow$ Dự án sinh lời cao hơn lãi suất gửi ngân hàng/chi phí vay $\\rightarrow$ **Đầu tư**.
+            * Nếu **IRR < WACC ({wacc}%)** $\\rightarrow$ Dự án không hiệu quả bằng việc dùng vốn làm việc khác $\\rightarrow$ **Loại bỏ**.
+            
+            👉 Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.
+            """)
+
+            st.divider()
+                                # --- 3. PHÂN TÍCH ĐỘ NHẠY (GIỮ NGUYÊN) ---
+            st.markdown("#### 4. Tại sao cần Phân tích Độ nhạy (Sensitivity)?")
+            st.write("""
                     Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. 
                     Ma trận bên dưới (Sensitivity Matrix) giúp trả lời câu hỏi: 
                     *"Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?"*
                     """)
 
-                # D. PHÂN TÍCH ĐỘ NHẠY (SENSITIVITY ANALYSIS)
-                # ------------------------------------------------------
-                st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
-                
-                # Tạo ma trận biến thiên
-                wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
-                depre_range = [depre - 2, depre - 1, depre, depre + 1, depre + 2]
-                
-                sensitivity_data = []
-                for w in wacc_range:
-                    row = []
-                    for d in depre_range:
-                        # Tính nhanh NPV loop
-                        sim_npv = -inv * fx_spot
-                        for t in range(1, years + 1):
-                            sim_fx = fx_spot * ((1 + d/100) ** t)
-                            sim_cf_usd = cf_yearly + (salvage_val if t == years else 0)
-                            sim_npv += (sim_cf_usd * sim_fx) / ((1 + w/100) ** t)
-                        row.append(sim_npv)
-                    sensitivity_data.append(row)
-                    
-                df_sens = pd.DataFrame(
-                    sensitivity_data, 
-                    index=[f"WACC {w:.1f}%" for w in wacc_range],
-                    columns=[f"Mất giá {d:.1f}%" for d in depre_range]
-                )
-                
-                def color_negative_red(val):
-                    color = '#ffcccc' if val < 0 else '#ccffcc'
-                    return f'background-color: {color}; color: black'
 
-                st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
-                
-                # E. AI ADVISOR (Context Updated)
-                # -------------------------------
-                st.markdown("---")
-                if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖"):
-                     if api_key:
-                        context = f"""
-                        Dự án FDI Thẩm định:
-                        - Vốn: {inv:,.0f} USD. CF hằng năm: {cf_yearly:,.0f} USD. Thanh lý: {salvage_val:,.0f} USD.
-                        - Số năm: {years}. WACC: {wacc}%. Mất giá VND: {depre}%.
-                        
-                        KẾT QUẢ CHẠY MÔ HÌNH:
-                        - NPV: {npv:,.0f} VND.
-                        - Hoàn vốn sau: {payback_period if payback_period else 'Không bao giờ'} năm.
-                        - ROI: {roi:.1f}%.
-                        """
-                        
-                        task = """
-                        Đóng vai Giám đốc Tài chính (CFO). 
-                        1. Nhận xét về tính khả thi của dự án (Dựa trên NPV và Thời gian hoàn vốn).
-                        2. Phân tích rủi ro tỷ giá: Với dự án thu dòng tiền USD (doanh thu xuất khẩu/FDI), việc VND mất giá là lợi hay hại? Tại sao?
-                        3. Đưa ra khuyến nghị cuối cùng: Duyệt (Approve) hay Từ chối (Reject)?
-                        """
-                        
-                        with st.spinner("CFO đang phân tích..."):
-                            advise = ask_gemini_advisor("CFO Advisor", context, task)
-                            st.markdown(f'<div class="ai-box"><h4>🤖 CFO NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
-                     else:
-                        st.warning("⚠️ Vui lòng nhập API Key.")
+        # D. PHÂN TÍCH ĐỘ NHẠY (SENSITIVITY ANALYSIS)
+        # ------------------------------------------------------
+        st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
+        st.markdown("Kiểm tra sức khỏe dự án khi **WACC** và **Mức mất giá VND** thay đổi.")
+        
+        # Tạo ma trận biến thiên
+        wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
+        depre_range = [depre - 2, depre - 1, depre, depre + 1, depre + 2]
+        
+        sensitivity_data = []
+        for w in wacc_range:
+            row = []
+            for d in depre_range:
+                # Tính nhanh NPV loop
+                sim_npv = -inv * fx_spot
+                for t in range(1, years + 1):
+                    sim_fx = fx_spot * ((1 + d/100) ** t)
+                    sim_cf_usd = cf_yearly + (salvage_val if t == years else 0)
+                    sim_npv += (sim_cf_usd * sim_fx) / ((1 + w/100) ** t)
+                row.append(sim_npv)
+            sensitivity_data.append(row)
+            
+        df_sens = pd.DataFrame(
+            sensitivity_data, 
+            index=[f"WACC {w:.1f}%" for w in wacc_range],
+            columns=[f"Mất giá {d:.1f}%" for d in depre_range]
+        )
+        
+        def color_negative_red(val):
+            color = '#ffcccc' if val < 0 else '#ccffcc'
+            return f'background-color: {color}; color: black'
 
-            st.markdown("---")
-            st.markdown(
+        st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
+        
+        # E. AI ADVISOR (UPDATED WITH IRR CONTEXT)
+        # -------------------------------
+        st.markdown("---")
+        if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖"):
+             if api_key:
+                context = f"""
+                Dự án FDI Thẩm định:
+                - Vốn: {inv:,.0f} USD. CF hằng năm: {cf_yearly:,.0f} USD. Thanh lý: {salvage_val:,.0f} USD.
+                - Số năm: {years}. WACC: {wacc}%. Mất giá VND: {depre}%.
+                
+                KẾT QUẢ CHẠY MÔ HÌNH:
+                - NPV: {npv:,.0f} VND.
+                - Hoàn vốn sau (DPP): {payback_period if payback_period else 'Không bao giờ'} năm.
+                - IRR (Hoàn vốn nội bộ): {irr_value:.2f}%. (So với WACC là {wacc}%)
                 """
-                <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
-                    © 2026 Designed by Nguyễn Minh Hải
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
+                
+                task = """
+                Đóng vai Giám đốc Tài chính (CFO). 
+                1. Nhận xét về tính khả thi của dự án dựa trên bộ chỉ số NPV và IRR (So sánh IRR với WACC).
+                2. Phân tích rủi ro tỷ giá: Với dự án thu dòng tiền USD (xuất khẩu/FDI), việc VND mất giá là lợi hay hại cho NPV tính bằng VND?
+                3. Đưa ra khuyến nghị cuối cùng: Duyệt (Approve) hay Từ chối (Reject)?
+                """
+                
+                with st.spinner("CFO đang phân tích..."):
+                    advise = ask_gemini_advisor("CFO Advisor", context, task)
+                    st.markdown(f'<div class="ai-box"><h4>🤖 CFO NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
+             else:
+                st.warning("⚠️ Vui lòng nhập API Key.")
+
+    st.markdown("---")
+    st.markdown(
+        """
+        <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
+            © 2026 Designed by Nguyễn Minh Hải
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
 
 # ==============================================================================
 # PHÒNG 5: MACRO STRATEGY (CÓ TÍCH HỢP AI)

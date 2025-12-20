@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import altair as alt
 import numpy as np
 import google.generativeai as genai
 import os
@@ -321,7 +322,7 @@ if "1." in room:
     with tab2:
         st.header("⚡ Săn Arbitrage (Kinh doanh chênh lệch giá)")
         
-        # 1. Nhập vốn (Cải tiến: Không fix cứng 1 triệu $)
+        # 1. Nhập vốn (Động)
         capital = st.number_input("Vốn kinh doanh (USD):", value=1000000.0, step=10000.0, format="%.0f")
         
         st.markdown("---")
@@ -332,56 +333,63 @@ if "1." in room:
         with k2: bank_b = st.number_input("Bank B (EUR/USD):", value=1.1000, help="Giá bán EUR lấy USD")
         with k3: bank_c = st.number_input("Bank C (EUR/VND):", value=28000.0, help="Giá bán EUR lấy VND")
         
-        # Nút chạy mô hình
+        # --- TÍNH TOÁN LOGIC (Tách ra để dùng chung cho cả Hiển thị và AI) ---
+        # Cách 1: USD -> EUR -> VND -> USD
+        path1_eur = capital / bank_b
+        path1_vnd = path1_eur * bank_c
+        path1_usd_final = path1_vnd / bank_a
+        profit1 = path1_usd_final - capital
+        
+        # Cách 2: USD -> VND -> EUR -> USD
+        path2_vnd = capital * bank_a
+        path2_eur = path2_vnd / bank_c
+        path2_usd_final = path2_eur * bank_b
+        profit2 = path2_usd_final - capital
+
+        # Xác định phương án tốt nhất để hiển thị và gửi cho AI
+        best_profit = max(profit1, profit2)
+        if profit1 > profit2:
+            best_direction = "Chiều xuôi: USD -> EUR -> VND -> USD"
+        else:
+            best_direction = "Chiều ngược: USD -> VND -> EUR -> USD"
+
+        # --- NÚT CHẠY MÔ HÌNH HIỂN THỊ ---
         if st.button("🚀 KÍCH HOẠT THUẬT TOÁN ARBITRAGE"):
             st.markdown("### 📝 Nhật ký giao dịch tối ưu:")
-            
-            # --- LOGIC TỰ ĐỘNG TÌM ĐƯỜNG CÓ LÃI ---
-            
-            # Cách 1: USD -> EUR -> VND -> USD (Vòng kim đồng hồ)
-            # Công thức: (Vốn / B) * C / A
-            res1_eur = capital / bank_b
-            res1_vnd = res1_eur * bank_c
-            res1_usd_final = res1_vnd / bank_a
-            profit1 = res1_usd_final - capital
-            
-            # Cách 2: USD -> VND -> EUR -> USD (Vòng ngược kim đồng hồ)
-            # Công thức: (Vốn * A) / C * B
-            res2_vnd = capital * bank_a
-            res2_eur = res2_vnd / bank_c
-            res2_usd_final = res2_eur * bank_b
-            profit2 = res2_usd_final - capital
-
-            # --- HIỂN THỊ KẾT QUẢ TỐT NHẤT ---
             
             if profit1 > 0:
                 # Hiển thị Cách 1
                 st.success(f"✅ PHÁT HIỆN CƠ HỘI: Mua EUR (Bank B) -> Bán lấy VND (Bank C)")
+                
+                # Dùng text-align left và margin để đảm bảo hiển thị đẹp
                 st.markdown(f"""
                 <div class="step-box">
                 1. <b>Dùng USD mua EUR (tại Bank B):</b><br>
-                   {capital:,.0f} / {bank_b} = <b>{res1_eur:,.2f} EUR</b><br><br>
+                   {capital:,.0f} / {bank_b} = <b>{path1_eur:,.2f} EUR</b><br><br>
                 2. <b>Bán EUR đổi lấy VND (tại Bank C):</b><br>
-                   {res1_eur:,.2f} × {bank_c} = <b>{res1_vnd:,.0f} VND</b> (Giá EUR ở C đang cao)<br><br>
+                   {path1_eur:,.2f} × {bank_c} = <b>{path1_vnd:,.0f} VND</b> (Giá EUR ở C đang cao)<br><br>
                 3. <b>Đổi VND về lại USD (tại Bank A):</b><br>
-                   {res1_vnd:,.0f} / {bank_a} = <b>{res1_usd_final:,.2f} USD</b>
+                   {path1_vnd:,.0f} / {bank_a} = <b>{path1_usd_final:,.2f} USD</b>
                 </div>
                 """, unsafe_allow_html=True)
+                
                 st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit1:,.2f} USD</div>', unsafe_allow_html=True)
 
             elif profit2 > 0:
                 # Hiển thị Cách 2
                 st.success(f"✅ PHÁT HIỆN CƠ HỘI: Bán USD (Bank A) -> Mua EUR (Bank C)")
+                
                 st.markdown(f"""
                 <div class="step-box">
                 1. <b>Đổi USD sang VND (tại Bank A):</b><br>
-                   {capital:,.0f} × {bank_a} = <b>{res2_vnd:,.0f} VND</b><br><br>
+                   {capital:,.0f} × {bank_a} = <b>{path2_vnd:,.0f} VND</b><br><br>
                 2. <b>Dùng VND mua EUR (tại Bank C):</b><br>
-                   {res2_vnd:,.0f} / {bank_c} = <b>{res2_eur:,.2f} EUR</b> (Giá EUR ở C đang rẻ)<br><br>
+                   {path2_vnd:,.0f} / {bank_c} = <b>{path2_eur:,.2f} EUR</b> (Giá EUR ở C đang rẻ)<br><br>
                 3. <b>Bán EUR đổi về USD (tại Bank B):</b><br>
-                   {res2_eur:,.2f} × {bank_b} = <b>{res2_usd_final:,.2f} USD</b>
+                   {path2_eur:,.2f} × {bank_b} = <b>{path2_usd_final:,.2f} USD</b>
                 </div>
                 """, unsafe_allow_html=True)
+                
                 st.markdown(f'<div class="result-box">🎉 LỢI NHUẬN: +{profit2:,.2f} USD</div>', unsafe_allow_html=True)
                 
             else:
@@ -390,29 +398,71 @@ if "1." in room:
 
             # Giải thích chung
             with st.expander("🎓 BẢN CHẤT: Tại sao có tiền lời?"):
-                st.write("""
-                **Nguyên lý:** Mua ở nơi giá thấp, bán ở nơi giá cao.
-                Máy tính đã tự động so sánh hai con đường:
-                1.  **Vòng 1:** Mua EUR quốc tế đem về VN bán.
-                2.  **Vòng 2:** Mua EUR ở VN đem ra quốc tế bán.
-                Nếu chênh lệch giá đủ lớn (lớn hơn phí giao dịch), lợi nhuận phi rủi ro sẽ xuất hiện.
-                """)
+                st.markdown("""
+                **Nguyên lý:** Mua ở nơi giá thấp, bán ở nơi giá cao (Buy Low, Sell High).
                 
-        # --- BỔ SUNG AI CHO PHÒNG 1 ---
+                Máy tính đã tự động so sánh hai con đường:
+                * **Vòng 1 (Chiều xuôi):** Mua EUR quốc tế đem về VN bán.
+                * **Vòng 2 (Chiều ngược):** Mua EUR ở VN đem ra quốc tế bán.
+                
+                Nếu chênh lệch giá đủ lớn (lớn hơn phí giao dịch), lợi nhuận phi rủi ro sẽ xuất hiện. Đây chính là cơ chế giúp tỷ giá toàn cầu cân bằng.
+                """)
+                # Diagram minh họa tam giác tỷ giá
+                st.write("") 
+
+            import streamlit as st
+        
+        # --- [MỚI] THÊM DÒNG NÀY ĐỂ TẠO KHUNG BAO QUANH ---
+        with st.container(border=True):
+        # MINH HỌA BẰNG SƠ ĐỒ GRAPHVIZ
+            st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
+
+            # Tạo sơ đồ
+            st.graphviz_chart('''
+                digraph {
+                    # Thiết lập hướng từ Trái sang Phải (Left to Right)
+                    rankdir=LR; 
+                    node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
+                    edge [color="#555555", fontname="Arial", fontsize=10];
+
+                    # Định nghĩa các nút (Nodes)
+                    MarketA [label="📉 Thị trường A\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
+                    MarketB [label="📈 Thị trường B\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
+                    Wallet [label="💰 TÚI TIỀN\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
+
+                    # Định nghĩa các đường đi (Edges)
+                    MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
+                    MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
+                    
+                    # Đường ẩn để căn chỉnh (nếu cần)
+                }
+            ''', use_container_width=True)
+
+            st.info("💡 **Dễ hiểu hơn:** Bạn giống như một người buôn chuyến, mua hàng ở chợ sỉ (giá rẻ) và mang ra chợ lẻ (giá cao) để bán ngay lập tức.")
+                
+        # --- BỔ SUNG AI CHO PHÒNG 1 (ĐÃ SỬA LỖI LOGIC ĐỘNG) ---
         st.markdown("---")
-        # Dùng tham số icon="🤖" để render ổn định hơn
+        
         if st.button("AI Trader: Đánh giá rủi ro", type="primary", icon="🤖"):
             if api_key:
-                # Tính toán lại giá trị để gửi cho AI
-                s1 = 1000000 / bank_b
-                s2 = s1 * bank_c
-                s3 = s2 / bank_a
-                prof = s3 - 1000000
+                # Context ĐỘNG: Lấy đúng số vốn và lợi nhuận vừa tính ở trên
+                context = f"""
+                Tình huống: Giao dịch Arbitrage Tỷ giá (Triangular Arbitrage).
+                - Số vốn đầu tư: {capital:,.0f} USD.
+                - Tỷ giá thị trường: Bank A (USD/VND)={bank_a}, Bank B (EUR/USD)={bank_b}, Bank C (EUR/VND)={bank_c}.
+                - Kết quả tính toán tốt nhất: {best_direction}.
+                - Lợi nhuận lý thuyết dự kiến: {best_profit:,.2f} USD.
+                """
                 
-                context = f"Vốn: 1M USD. Tỷ giá A: {bank_a}, B: {bank_b}, C: {bank_c}. Lợi nhuận dự kiến: {prof:.2f} USD."
-                task = "Đánh giá rủi ro thanh khoản, độ trượt giá (Slippage) khi thực hiện 3 lệnh liên tiếp. Có nên vào lệnh không?"
+                task = """
+                Đóng vai một Senior FX Trader tại ngân hàng đầu tư (Goldman Sachs/JP Morgan).
+                Hãy phân tích ngắn gọn:
+                1. Rủi ro thực tế khi thực hiện 3 lệnh liên tiếp là gì (Gợi ý: Độ trễ/Latency và Trượt giá/Slippage)?
+                2. Với mức lợi nhuận dự kiến trên, có đáng để mạo hiểm vào lệnh không? (So sánh với phí giao dịch transaction cost).
+                3. Đưa ra quyết định: GO (Vào lệnh) hay NO-GO (Hủy)?
+                """
                 
-                with st.spinner("AI đang phân tích thị trường..."):
+                with st.spinner(f"AI đang phân tích cơ hội với vốn {capital:,.0f} USD..."):
                     advise = ask_gemini_advisor("Senior FX Trader", context, task)
                     st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise}</div>', unsafe_allow_html=True)
             else:
@@ -618,6 +668,42 @@ elif "2." in room:
         "Tổng chi phí (VND)": "{:,.0f}"
     }))
 
+    # --- [MỚI] BIỂU ĐỒ SO SÁNH TRỰC QUAN ---
+    st.caption("👇 Biểu đồ so sánh: Cột màu XANH là phương án có chi phí thấp nhất")
+
+    import altair as alt
+
+    # 1. Xử lý dữ liệu: Tìm giá trị rẻ nhất để tô màu
+    min_val = df_compare["Tổng chi phí (VND)"].min()
+    
+    # Tạo cột màu: Nếu bằng giá thấp nhất thì màu Xanh (#22c55e), còn lại màu Xám (#94a3b8)
+    df_compare["Color"] = df_compare["Tổng chi phí (VND)"].apply(lambda x: "#22c55e" if x == min_val else "#94a3b8")
+
+    # 2. Vẽ biểu đồ Cột (Bar Chart)
+    base = alt.Chart(df_compare).encode(
+        x=alt.X('Chiến lược', axis=alt.Axis(labelAngle=0, title=None)), # Nhãn ngang, không nghiêng
+        y=alt.Y('Tổng chi phí (VND)', axis=alt.Axis(format=',.0f')),    # Trục tung format số
+        tooltip=['Chiến lược', alt.Tooltip('Tổng chi phí (VND)', format=',.0f')] # Rê chuột hiện số
+    )
+
+    # Cột
+    bars = base.mark_bar(cornerRadius=6).encode(
+        color=alt.Color('Color', scale=None) # Dùng màu đã định nghĩa ở trên
+    )
+
+    # Nhãn số tiền trên đầu cột (Text Label)
+    text = base.mark_text(
+        align='center',
+        baseline='bottom',
+        dy=-5,  # Dịch chuyển chữ lên trên cột một chút
+        color='black'
+    ).encode(
+        text=alt.Text('Tổng chi phí (VND)', format=',.0f')
+    )
+
+    # 3. Hiển thị biểu đồ (Kết hợp Cột + Chữ)
+    st.altair_chart(bars + text, use_container_width=True)
+
     # --- KẾT LUẬN TỰ ĐỘNG ---
     best_idx = df_compare['Tổng chi phí (VND)'].idxmin()
     best_strat = df_compare.loc[best_idx, "Chiến lược"]
@@ -772,15 +858,15 @@ elif "3." in room:
             st.subheader("📊 Kết quả Tổng hợp")
             m1, m2, m3 = st.columns(3)
             
-            # Logic Delta màu sắc
+            # Logic Delta màu sắc: Tìm giá rẻ nhất để so sánh
             best_price = min(tt_final, col_final, lc_final)
             
             m1.metric("1. Tổng phí T/T", f"${tt_final:,.2f}", 
-                      delta="Rẻ nhất" if tt_final == best_price else None, delta_color="inverse")
+                      delta="Rẻ nhất (Rủi ro cao)" if tt_final == best_price else None, delta_color="inverse")
             m2.metric("2. Tổng phí Nhờ thu", f"${col_final:,.2f}",
-                      delta="Rẻ nhất" if col_final == best_price else None, delta_color="inverse")
+                      delta=f"+${col_final - tt_final:,.2f} vs T/T", delta_color="off")
             m3.metric("3. Tổng phí L/C", f"${lc_final:,.2f}", 
-                      delta=f"Chênh lệch: +${lc_final - tt_final:,.2f} so với T/T", delta_color="off")
+                      delta=f"+${lc_final - tt_final:,.2f} vs T/T", delta_color="off")
 
             # --- BIỂU ĐỒ ---
             chart_data = pd.DataFrame({
@@ -789,92 +875,81 @@ elif "3." in room:
                 "Chi phí Vốn (Lãi)": [tt_interest, col_interest, lc_interest]
             })
             st.bar_chart(chart_data.set_index("Phương thức"), stack=True, color=["#FF6C6C", "#4B4BFF"])
+            
+            # --- [HÌNH ẢNH MINH HỌA] ---
+            # Thêm hình ảnh để minh họa phổ rủi ro vs chi phí
+            st.write("")
 
             # --- [QUAN TRỌNG] DIỄN GIẢI CÔNG THỨC (FIXED DISPLAY) ---
             st.markdown("### 🧮 Bảng chi tiết lời giải (Step-by-step)")
             st.info("Dưới đây là cách tính chi tiết giúp bạn hiểu rõ nguồn gốc các con số:")
 
-            # Lưu ý: Dùng ký tự \$ để tránh lỗi xung đột với công thức toán LaTeX ($...$)
-            
-            # 1. T/T (CHUYỂN TIỀN)
+            # 1. T/T
             with st.expander("1️⃣ Chi tiết tính toán: T/T (Chuyển tiền)", expanded=False):
                 st.latex(r"Cost_{T/T} = \text{Phí Bank} + \text{Lãi Vốn}")
-                
-                # Sử dụng dedent hoặc viết sát lề để tránh lỗi hiển thị code block
                 st.markdown(f"""
-**A. Phí dịch vụ Ngân hàng:**
-* Tính sơ bộ: {val:,.0f} USD × {tt_pct}% = {tt_raw:,.2f} USD
-* So sánh Min/Max ({tt_min} - {tt_max}) → Phí áp dụng: **{tt_bank_fee:,.2f} USD**
-* Cộng Điện phí ({tt_other} USD) → Tổng phí Bank: **{tt_total_bank:,.2f} USD**
+                **A. Phí dịch vụ Ngân hàng:**
+                * Tính sơ bộ: {val:,.0f} USD × {tt_pct}% = {tt_raw:,.2f} USD
+                * So sánh Min/Max ({tt_min} - {tt_max}) → Phí áp dụng: **{tt_bank_fee:,.2f} USD**
+                * Cộng Điện phí ({tt_other} USD) → Tổng phí Bank: **{tt_total_bank:,.2f} USD**
 
-**B. Chi phí vốn (Lãi vay):**
-* Công thức: $\\text{{Giá trị}} \\times \\text{{Lãi suất}} \\times \\frac{{\\text{{Ngày}}}}{{360}}$
-* Thế số: {val:,.0f} × {interest_rate}% × ({days_tt}/360) = **{tt_interest:,.2f} USD**
-
-👉 **TỔNG CHI PHÍ T/T:** {tt_total_bank:,.2f} + {tt_interest:,.2f} = **{tt_final:,.2f} USD**
+                **B. Chi phí vốn (Lãi vay):**
+                * Công thức: $\\text{{Giá trị}} \\times \\text{{Lãi suất}} \\times \\frac{{\\text{{Ngày}}}}{{360}}$
+                * Thế số: {val:,.0f} × {interest_rate}% × ({days_tt}/360) = **{tt_interest:,.2f} USD**
                 """)
 
-            # 2. COLLECTION (NHỜ THU)
+            # 2. COLLECTION
             with st.expander("2️⃣ Chi tiết tính toán: Nhờ thu (Collection)", expanded=False):
                 st.latex(r"Cost_{Col} = \text{Phí Nhờ Thu} + \text{Phí Khác} + \text{Lãi Vốn}")
-                
                 st.markdown(f"""
-**A. Phí dịch vụ Ngân hàng:**
-* Tính sơ bộ: {val:,.0f} USD × {col_pct}% = {col_raw:,.2f} USD
-* So sánh Min/Max ({col_min} - {col_max}) → Phí áp dụng: **{col_bank_fee:,.2f} USD**
-* Cộng phí khác ({col_other} USD) → Tổng phí Bank: **{col_total_bank:,.2f} USD**
+                **A. Phí dịch vụ Ngân hàng:**
+                * Tính sơ bộ: {val:,.0f} USD × {col_pct}% = {col_raw:,.2f} USD
+                * So sánh Min/Max ({col_min} - {col_max}) → Phí áp dụng: **{col_bank_fee:,.2f} USD**
+                * Cộng phí khác ({col_other} USD) → Tổng phí Bank: **{col_total_bank:,.2f} USD**
 
-**B. Chi phí vốn:**
-* Thế số: {val:,.0f} × {interest_rate}% × ({days_col}/360) = **{col_interest:,.2f} USD**
-
-👉 **TỔNG CHI PHÍ COLLECTION:** {col_total_bank:,.2f} + {col_interest:,.2f} = **{col_final:,.2f} USD**
+                **B. Chi phí vốn:**
+                * Thế số: {val:,.0f} × {interest_rate}% × ({days_col}/360) = **{col_interest:,.2f} USD**
                 """)
 
-            # 3. L/C (TÍN DỤNG THƯ)
-            with st.expander("3️⃣ Chi tiết tính toán: L/C (Tín dụng thư)", expanded=True):
+            # 3. L/C
+            with st.expander("3️⃣ Chi tiết tính toán: L/C (Tín dụng thư)", expanded=False):
                 st.latex(r"Cost_{LC} = \text{Phí Mở} + \text{Phí T.Toán} + \text{Phí Khác} + \text{Lãi Vốn}")
-                
                 st.markdown(f"""
-**A. Các loại phí Ngân hàng:**
-* Phí Mở L/C: {val:,.0f} × {lc_open_pct}% = {lc_open_fee:,.2f} USD *(Tối thiểu {lc_min} USD)*
-* Phí Thanh toán: {val:,.0f} × {lc_pay_pct}% = {lc_pay_fee:,.2f} USD
-* Phí Khác: {lc_other:,.2f} USD
+                **A. Các loại phí Ngân hàng:**
+                * Phí Mở L/C: {val:,.0f} × {lc_open_pct}% = {lc_open_fee:,.2f} USD *(Tối thiểu {lc_min} USD)*
+                * Phí Thanh toán: {val:,.0f} × {lc_pay_pct}% = {lc_pay_fee:,.2f} USD
+                * Phí Khác: {lc_other:,.2f} USD
 
-**B. Chi phí vốn (Gánh nặng lớn nhất):**
-* Do L/C giữ vốn lâu hơn ({days_lc} ngày), tiền lãi phát sinh là:
-* {val:,.0f} × {interest_rate}% × ({days_lc}/360) = **{lc_interest:,.2f} USD**
-
-👉 **TỔNG CHI PHÍ L/C:** {lc_total_bank:,.2f} (Bank) + {lc_interest:,.2f} (Lãi) = **{lc_final:,.2f} USD**
+                **B. Chi phí vốn (Gánh nặng lớn nhất):**
+                * Do L/C giữ vốn lâu hơn ({days_lc} ngày), tiền lãi phát sinh là:
+                * {val:,.0f} × {interest_rate}% × ({days_lc}/360) = **{lc_interest:,.2f} USD**
                 """)
                 
-            # --- KẾT LUẬN QUẢN TRỊ ---
+            # --- KẾT LUẬN QUẢN TRỊ (DYNAMIC LOGIC UPDATE) ---
             st.markdown("---")
-            diff_val = lc_final - tt_final
             
-            #  - có thể thêm diagram ở đây nếu cần minh họa quy trình
+            # Tính toán chênh lệch
+            diff_lc = lc_final - tt_final
+            diff_col = col_final - tt_final
             
-            if diff_val > 0:
-                # Dùng st.container để bọc nội dung, giúp định dạng markdown ổn định hơn
-                with st.container():
-                    st.success(f"""
-                    #### 💡 GÓC NHÌN QUẢN TRỊ
-                    
-                    Để có được sự an toàn tuyệt đối của phương thức L/C, doanh nghiệp phải trả thêm chi phí bảo hiểm rủi ro là:
-                    
-                    # {diff_val:,.2f} USD
-                    *(Chênh lệch giữa L/C và T/T)*
-                    
-                    Hãy tự đặt câu hỏi: **"Việc loại bỏ rủi ro mất trắng lô hàng trị giá {val:,.0f} USD có xứng đáng với mức phí {diff_val:,.2f} USD này không?"**
-                    
-                    Nếu câu trả lời là **CÓ**, thì L/C là phương án tối ưu!
-                    """)
-            else:
-                st.warning(f"""
-                ⚠️ **TRƯỜNG HỢP ĐẶC BIỆT:**
-                Hiện tại chi phí L/C đang **RẺ HƠN** hoặc **BẰNG** T/T.
-                * Chênh lệch: {diff_val:,.2f} USD
-                * Nguyên nhân: Có thể do số ngày chiếm dụng vốn (Days) của T/T đang được cấu hình quá cao.
+            with st.container():
+                st.success(f"""
+                #### 💡 GÓC NHÌN QUẢN TRỊ (MANAGEMENT INSIGHT)
+                
+                Dưới góc độ tài chính, chênh lệch chi phí chính là **"Phí mua sự an toàn"**. 
+                Với lô hàng **{val:,.0f} USD** này, thị trường đang ra giá cho rủi ro như sau:
+                
+                **1. Nếu chọn NHỜ THU (Collection):**
+                * Bạn trả thêm: **{diff_col:,.2f} USD** so với T/T.
+                * *Đánh giá:* Mức phí trung bình. Ngân hàng hỗ trợ khống chế bộ chứng từ, nhưng không cam kết trả tiền thay người mua.
+                
+                **2. Nếu chọn L/C (Tín dụng thư):**
+                * Bạn trả thêm: **{diff_lc:,.2f} USD** so với T/T.
+                * *Đánh giá:* Mức phí cao nhất. Đổi lại, bạn mua được cam kết thanh toán từ Ngân hàng, loại bỏ rủi ro đối tác mất khả năng chi trả.
+                
+                👉 **QUYẾT ĐỊNH:** Nếu bạn thấy rủi ro mất trắng lô hàng {val:,.0f} USD là hiện hữu, thì con số **{diff_lc:,.2f} USD** là quá rẻ để bảo hiểm cho toàn bộ dòng tiền.
                 """)
+
         st.markdown("---")
         st.markdown(
             """
@@ -887,182 +962,211 @@ elif "3." in room:
 
     with tab_check:
         st.subheader("1. Giả lập Bộ chứng từ & Soát xét lỗi")
+    
+    # --- 0. KHỞI TẠO STATE (Lưu trạng thái các nút bấm) ---
+    # Các cờ (Flags) để biết nút nào đang được BẬT
+    if 's_late_ship' not in st.session_state: st.session_state['s_late_ship'] = False
+    if 's_late_pres' not in st.session_state: st.session_state['s_late_pres'] = False
+    if 's_over_amt' not in st.session_state: st.session_state['s_over_amt'] = False
+    if 's_dirty_bl' not in st.session_state: st.session_state['s_dirty_bl'] = False
+
+    # Các giá trị Input (Ngày tháng, số tiền)
+    if 'chk_ship' not in st.session_state: st.session_state['chk_ship'] = pd.to_datetime("2025-01-15")
+    if 'chk_exp' not in st.session_state: st.session_state['chk_exp'] = pd.to_datetime("2025-02-28")
+    if 'chk_pres' not in st.session_state: st.session_state['chk_pres'] = pd.to_datetime("2025-01-20")
+    if 'chk_inv' not in st.session_state: st.session_state['chk_inv'] = 100000.0
+    if 'chk_dirty' not in st.session_state: st.session_state['chk_dirty'] = False
+
+    # --- HÀM LOGIC: Cập nhật dữ liệu dựa trên các nút đang BẬT ---
+    def update_inputs():
+        # 1. Đặt về mặc định (Sạch) trước
+        ship = pd.to_datetime("2025-01-15")
+        exp = pd.to_datetime("2025-02-28")
+        pres = pd.to_datetime("2025-01-20")
+        amt = 100000.0
+        is_dirty = False
+
+        # 2. Cộng dồn các lỗi (Nếu nút đang BẬT)
         
-        # --- [MỚI] KHUNG GỢI Ý KỊCH BẢN THỰC HÀNH ---
-        with st.expander("🎯 GỢI Ý KỊCH BẢN: Bấm vào đây để tự động tạo lỗi", expanded=True):
-            st.write("Chọn một tình huống bên dưới để máy tính tự điền số liệu, sau đó bấm **'Soát xét chứng từ'** để xem kết quả.")
-            sc1, sc2, sc3, sc4 = st.columns(4)
-            
-            # Helper function để reset session state an toàn
-            def set_scenario(ship, exp, pres, amount, dirty):
-                st.session_state['chk_ship'] = pd.to_datetime(ship)
-                st.session_state['chk_exp'] = pd.to_datetime(exp)
-                st.session_state['chk_pres'] = pd.to_datetime(pres)
-                st.session_state['chk_inv'] = float(amount)
-                st.session_state['chk_dirty'] = dirty
-
-            with sc1:
-                if st.button("🚢 Lỗi Giao trễ", help="Mô phỏng: Hàng giao sau ngày hết hạn L/C"):
-                    set_scenario("2025-03-01", "2025-02-28", "2025-03-05", 100000.0, False)
-                    st.toast("Đã nạp kịch bản: Giao hàng sau ngày hết hạn L/C!")
-            
-            with sc2:
-                if st.button("🕒 Lỗi Xuất trình muộn", help="Mô phỏng: Xuất trình quá 21 ngày sau khi giao hàng"):
-                    set_scenario("2025-01-01", "2025-02-28", "2025-01-25", 100000.0, False) # 24 ngày
-                    st.toast("Đã nạp kịch bản: Xuất trình quá 21 ngày!")
-            
-            with sc3:
-                if st.button("💸 Lỗi Vượt tiền", help="Mô phỏng: Hóa đơn vượt quá giá trị L/C cho phép"):
-                    set_scenario("2025-01-15", "2025-02-28", "2025-01-20", 110000.0, False) # Vượt 10%
-                    st.toast("Đã nạp kịch bản: Số tiền vượt dung sai!")
-
-            with sc4:
-                if st.button("📝 Lỗi B/L bẩn", help="Mô phỏng: Vận đơn có ghi chú xấu"):
-                    set_scenario("2025-01-15", "2025-02-28", "2025-01-20", 100000.0, True)
-                    st.toast("Đã nạp kịch bản: Vận đơn không hoàn hảo!")
+        # Nếu lỗi Giao trễ -> Đẩy ngày giao sau ngày hết hạn
+        if st.session_state['s_late_ship']:
+            ship = pd.to_datetime("2025-03-01") 
         
-        st.markdown("---")
+        # Nếu lỗi Xuất trình muộn -> Đẩy ngày xuất trình = Ngày giao + 24 ngày
+        if st.session_state['s_late_pres']:
+            pres = ship + pd.Timedelta(days=24)
+        else:
+            # Nếu không lỗi, giữ logic hợp lý (Giao + 5 ngày) nhưng phải check lại nếu ship đã đổi
+            pres = ship + pd.Timedelta(days=5)
 
-        # --- INPUTS (Đã gắn Key để liên kết với các nút bấm trên) ---
-        c1, c2 = st.columns(2)
+        # Nếu lỗi Tiền -> Tăng tiền
+        if st.session_state['s_over_amt']:
+            amt = 110000.0 # Vượt dung sai
         
-        with c1:
-            st.markdown("#### 📅 Yếu tố Thời gian")
-            # Thiết lập giá trị mặc định nếu chưa có trong session_state
-            if 'chk_ship' not in st.session_state: st.session_state['chk_ship'] = pd.to_datetime("2025-01-15")
-            if 'chk_exp' not in st.session_state: st.session_state['chk_exp'] = pd.to_datetime("2025-02-28")
-            if 'chk_pres' not in st.session_state: st.session_state['chk_pres'] = pd.to_datetime("2025-01-20")
+        # Nếu lỗi B/L -> Tick chọn
+        if st.session_state['s_dirty_bl']:
+            is_dirty = True
 
-            lc_issue_date = st.date_input("Ngày phát hành L/C:", value=pd.to_datetime("2025-01-01"))
-            # Sử dụng key để nút bấm phía trên có thể can thiệp vào giá trị
-            ship_date = st.date_input("Ngày giao hàng (On Board Date):", key='chk_ship')
-            lc_exp_date = st.date_input("Ngày hết hạn L/C (Expiry Date):", key='chk_exp')
-            pres_date = st.date_input("Ngày xuất trình (Presentation Date):", key='chk_pres')
-            
-        with c2:
-            st.markdown("#### 💰 Yếu tố Tài chính & Hàng hóa")
-            if 'chk_inv' not in st.session_state: st.session_state['chk_inv'] = 104000.0
-            if 'chk_dirty' not in st.session_state: st.session_state['chk_dirty'] = False
+        # 3. Gán ngược lại vào Session State của Input
+        st.session_state['chk_ship'] = ship
+        st.session_state['chk_exp'] = exp
+        st.session_state['chk_pres'] = pres
+        st.session_state['chk_inv'] = amt
+        st.session_state['chk_dirty'] = is_dirty
 
-            lc_amount = st.number_input("Giá trị L/C (USD):", value=100000.0, step=1000.0)
-            tolerance = st.number_input("Dung sai cho phép (+/- %):", value=5.0, step=1.0, help="Điều 30 UCP 600")
-            inv_amount = st.number_input("Giá trị Hóa đơn Thương mại (Invoice):", step=1000.0, key='chk_inv')
-            
-            st.markdown("#### 📝 Tình trạng Vận đơn (B/L)")
-            is_dirty_bl = st.checkbox("Trên B/L có ghi chú xấu? (VD: 'Bao bì rách')", key='chk_dirty')
-            
-        st.markdown("---")
+    # Hàm Reset toàn bộ
+    def reset_scenarios():
+        st.session_state['s_late_ship'] = False
+        st.session_state['s_late_pres'] = False
+        st.session_state['s_over_amt'] = False
+        st.session_state['s_dirty_bl'] = False
+        update_inputs() # Cập nhật lại về mặc định
+
+    # Hàm Toggle (Bật/Tắt) từng nút
+    def toggle_scenario(key):
+        st.session_state[key] = not st.session_state[key]
+        update_inputs()
+
+    # --- [GIAO DIỆN] KHUNG CHỌN TÌNH HUỐNG ---
+    with st.expander("🎯 GỢI Ý KỊCH BẢN (Cho phép chọn nhiều lỗi cùng lúc)", expanded=True):
+        st.write("Bấm vào các nút để **Bật/Tắt** tình huống lỗi tương ứng (Nút sáng màu là đang chọn):")
         
-        # --- NÚT CHECKING ---
-        if st.button("🔍 SOÁT XÉT CHỨNG TỪ (CHECKING)"):
-            errors = []
-            
-            # 1. Logic Kiểm tra Thời gian
-            if ship_date > lc_exp_date:
-                errors.append(("Late Shipment", "Ngày giao hàng diễn ra SAU ngày hết hạn L/C.", "Điều 14c"))
-            
-            if pres_date > lc_exp_date:
-                errors.append(("L/C Expired", "Ngày xuất trình diễn ra SAU ngày hết hạn L/C.", "Điều 6d"))
-                
-            presentation_period = (pres_date - ship_date).days
-            if presentation_period > 21:
-                errors.append(("Stale Documents", f"Xuất trình muộn {presentation_period} ngày (UCP 600 quy định tối đa 21 ngày).", "Điều 14c"))
-            
-            if presentation_period < 0:
-                 errors.append(("Impossible Date", "Ngày xuất trình diễn ra TRƯỚC ngày giao hàng (Phi logic).", "Logic"))
-
-            # 2. Logic Kiểm tra Số tiền
-            max_allowed = lc_amount * (1 + tolerance/100)
-            if inv_amount > max_allowed:
-                over_amt = inv_amount - max_allowed
-                errors.append(("Overdrawn Credit", f"Số tiền hóa đơn ({inv_amount:,.0f}) vượt quá dung sai cho phép ({max_allowed:,.0f}).", "Điều 30b"))
-
-            # 3. Logic Kiểm tra B/L
-            if is_dirty_bl:
-                errors.append(("Unclean B/L", "Vận đơn không hoàn hảo (Dirty/Claused B/L). Ngân hàng từ chối thanh toán.", "Điều 27"))
-
-            # --- HIỂN THỊ KẾT QUẢ ---
-            if not errors:
-                st.success("✅ **CLEAN DOCUMENTS (BỘ CHỨNG TỪ HỢP LỆ)**")
-                st.balloons()
-                st.info("💡 **Kết luận:** Ngân hàng phát hành **bắt buộc phải thanh toán** (Honour).")
-            else:
-                st.error(f"❌ **DISCREPANT DOCUMENTS (PHÁT HIỆN {len(errors)} LỖI BẤT HỢP LỆ)**")
-                
-                for idx, (err_name, err_desc, ucp_art) in enumerate(errors, 1):
-                    st.markdown(f"""
-                    <div style="background-color: #ffeded; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #ff4b4b;">
-                        <strong>{idx}. Lỗi: {err_name}</strong><br>
-                        Explain: <em>{err_desc}</em><br>
-                        ⚖️ Căn cứ: <strong>UCP 600 - {ucp_art}</strong>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.warning("👉 **Hậu quả:** Ngân hàng có quyền TỪ CHỐI THANH TOÁN và thu phí bất hợp lệ (Discrepancy Fee) từ 50-100 USD/lỗi.")
+        sc1, sc2, sc3, sc4, sc5 = st.columns(5)
         
-        # --- NÚT GỌI AI (ĐÃ NÂNG CẤP CONTEXT CHI TIẾT) ---
-        st.markdown("---")
-        if st.button("AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖"):
-            if api_key:
-                # 1. TÍNH LẠI LOGIC (Để đảm bảo có dữ liệu mới nhất ngay cả khi chưa bấm nút Soát xét)
-                curr_errs = []
-                
-                # Check Thời gian
-                if ship_date > lc_exp_date: 
-                    curr_errs.append(f"Late Shipment (Giao {ship_date.strftime('%d/%m')} sau hạn {lc_exp_date.strftime('%d/%m')})")
-                if pres_date > lc_exp_date: 
-                    curr_errs.append("L/C Expired (L/C đã hết hạn)")
-                
-                days_late = (pres_date - ship_date).days
-                if days_late > 21: 
-                    curr_errs.append(f"Stale Documents (Xuất trình muộn {days_late} ngày > 21 ngày)")
-                
-                # Check Số tiền
-                max_allow = lc_amount * (1 + tolerance/100)
-                if inv_amount > max_allow: 
-                    curr_errs.append(f"Overdrawn (Invoice {inv_amount:,.0f} > Max {max_allow:,.0f})")
-                
-                # Check B/L
-                if is_dirty_bl: 
-                    curr_errs.append("Unclean/Dirty B/L (Vận đơn có ghi chú xấu)")
-                
-                # 2. TẠO CONTEXT GỬI AI (Bổ sung thông tin chi tiết)
-                context = f"""
-                Tôi là nhân viên ngân hàng đang kiểm tra bộ chứng từ thanh toán L/C (UCP 600).
-                
-                DỮ LIỆU CỤ THỂ:
-                - Ngày giao hàng: {ship_date}
-                - Ngày hết hạn L/C: {lc_exp_date}
-                - Ngày xuất trình: {pres_date}
-                - Số tiền Invoice: {inv_amount:,.0f} USD (L/C: {lc_amount:,.0f} USD, Dung sai {tolerance}%)
-                - Tình trạng B/L: {'Có ghi chú xấu (Dirty)' if is_dirty_bl else 'Sạch (Clean)'}
-                
-                DANH SÁCH LỖI MÁY TÍNH PHÁT HIỆN:
-                {', '.join(curr_errs) if curr_errs else 'Không có lỗi (Clean Documents)'}
-                """
-                
-                task = """
-                Đóng vai Chuyên gia pháp lý UCP 600 (Legal Advisor).
-                1. Hãy giải thích ngắn gọn tại sao các lỗi trên lại nghiêm trọng? (Dựa vào số ngày/số tiền cụ thể ở trên để giải thích).
-                2. Nếu tôi là Ngân hàng Phát hành, tôi có quyền TỪ CHỐI THANH TOÁN (Dishonour) không?
-                3. Đưa ra lời khuyên cho Doanh nghiệp xuất khẩu: Lần sau phải làm gì để tránh lỗi này?
-                """
-                
-                with st.spinner("Luật sư đang tra cứu điều khoản UCP 600..."):
-                    advise = ask_gemini_advisor("Legal Expert (UCP 600)", context, task)
-                    st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN PHÁP LÝ & CÁCH KHẮC PHỤC</h4>{advise}</div>', unsafe_allow_html=True)
-            else:
-                st.warning("⚠️ Vui lòng nhập API Key.")
+        with sc1:
+            # Nút Giao trễ
+            btn_type = "primary" if st.session_state['s_late_ship'] else "secondary"
+            if st.button("🚢 Giao trễ", key="btn_late", type=btn_type, help="Giao hàng sau ngày hết hạn L/C", use_container_width=True):
+                toggle_scenario('s_late_ship')
+                st.rerun()
 
-        st.markdown("---")
-        st.markdown(
+        with sc2:
+            # Nút Xuất trình muộn
+            btn_type = "primary" if st.session_state['s_late_pres'] else "secondary"
+            if st.button("🕒 Trình muộn", key="btn_pres", type=btn_type, help="Xuất trình quá 21 ngày", use_container_width=True):
+                toggle_scenario('s_late_pres')
+                st.rerun()
+
+        with sc3:
+            # Nút Vượt tiền
+            btn_type = "primary" if st.session_state['s_over_amt'] else "secondary"
+            if st.button("💸 Vượt tiền", key="btn_amt", type=btn_type, help="Hóa đơn vượt quá dung sai", use_container_width=True):
+                toggle_scenario('s_over_amt')
+                st.rerun()
+
+        with sc4:
+            # Nút B/L bẩn
+            btn_type = "primary" if st.session_state['s_dirty_bl'] else "secondary"
+            if st.button("📝 B/L bẩn", key="btn_dirty", type=btn_type, help="Vận đơn có ghi chú xấu", use_container_width=True):
+                toggle_scenario('s_dirty_bl')
+                st.rerun()
+        
+        with sc5:
+            # Nút Reset (Nằm riêng, icon xoay)
+            if st.button("🔄 Reset", help="Xóa hết chọn, quay về mặc định", type="secondary", use_container_width=True):
+                reset_scenarios()
+                st.rerun()
+
+    st.markdown("---")
+
+    # --- INPUTS (Đã gắn Key để liên kết với logic trên) ---
+    c1, c2 = st.columns(2)
+    
+    with c1:
+        st.markdown("#### 📅 Yếu tố Thời gian")
+        lc_issue_date = st.date_input("Ngày phát hành L/C:", value=pd.to_datetime("2025-01-01"))
+        
+        # Các input này tự động nhảy số khi hàm update_inputs() chạy
+        ship_date = st.date_input("Ngày giao hàng (On Board Date):", key='chk_ship')
+        lc_exp_date = st.date_input("Ngày hết hạn L/C (Expiry Date):", key='chk_exp')
+        pres_date = st.date_input("Ngày xuất trình (Presentation Date):", key='chk_pres')
+        
+    with c2:
+        st.markdown("#### 💰 Yếu tố Tài chính & Hàng hóa")
+        lc_amount = st.number_input("Giá trị L/C (USD):", value=100000.0, step=1000.0)
+        tolerance = st.number_input("Dung sai cho phép (+/- %):", value=5.0, step=1.0)
+        
+        inv_amount = st.number_input("Giá trị Hóa đơn Thương mại (Invoice):", step=1000.0, key='chk_inv')
+        
+        st.markdown("#### 📝 Tình trạng Vận đơn (B/L)")
+        is_dirty_bl = st.checkbox("Trên B/L có ghi chú xấu? (VD: 'Bao bì rách')", key='chk_dirty')
+        
+    st.markdown("---")
+    
+    # --- NÚT CHECKING (Logic giữ nguyên, chỉ lấy giá trị từ biến) ---
+    if st.button("🔍 SOÁT XÉT CHỨNG TỪ (CHECKING)", type="secondary", use_container_width=True):
+        errors = []
+        
+        # 1. Logic Kiểm tra Thời gian
+        if ship_date > lc_exp_date:
+            errors.append(("Late Shipment", "Ngày giao hàng diễn ra SAU ngày hết hạn L/C.", "Điều 14c"))
+        
+        if pres_date > lc_exp_date:
+            errors.append(("L/C Expired", "Ngày xuất trình diễn ra SAU ngày hết hạn L/C.", "Điều 6d"))
+            
+        presentation_period = (pres_date - ship_date).days
+        if presentation_period > 21:
+            errors.append(("Stale Documents", f"Xuất trình muộn {presentation_period} ngày (UCP 600 quy định tối đa 21 ngày).", "Điều 14c"))
+        
+        if presentation_period < 0:
+             errors.append(("Impossible Date", "Ngày xuất trình diễn ra TRƯỚC ngày giao hàng (Phi logic).", "Logic"))
+
+        # 2. Logic Kiểm tra Số tiền
+        max_allowed = lc_amount * (1 + tolerance/100)
+        if inv_amount > max_allowed:
+            over_amt = inv_amount - max_allowed
+            errors.append(("Overdrawn Credit", f"Số tiền hóa đơn ({inv_amount:,.0f}) vượt quá dung sai cho phép ({max_allowed:,.0f}).", "Điều 30b"))
+
+        # 3. Logic Kiểm tra B/L
+        if is_dirty_bl:
+            errors.append(("Unclean B/L", "Vận đơn không hoàn hảo (Dirty/Claused B/L). Ngân hàng từ chối thanh toán.", "Điều 27"))
+
+        # --- HIỂN THỊ KẾT QUẢ ---
+        if not errors:
+            st.success("✅ **CLEAN DOCUMENTS (BỘ CHỨNG TỪ HỢP LỆ)**")
+            st.balloons()
+            st.info("💡 **Kết luận:** Ngân hàng phát hành **bắt buộc phải thanh toán** (Honour).")
+        else:
+            st.error(f"❌ **DISCREPANT DOCUMENTS (PHÁT HIỆN {len(errors)} LỖI BẤT HỢP LỆ)**")
+            
+            for idx, (err_name, err_desc, ucp_art) in enumerate(errors, 1):
+                st.markdown(f"""
+                <div style="background-color: #ffeded; color: #333333; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 5px solid #ff4b4b;">
+                    <strong>{idx}. Lỗi: {err_name}</strong><br>
+                    Explain: <em>{err_desc}</em><br>
+                    ⚖️ Căn cứ: <strong>UCP 600 - {ucp_art}</strong>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            st.warning("👉 **Hậu quả:** Ngân hàng có quyền TỪ CHỐI THANH TOÁN và thu phí bất hợp lệ (Discrepancy Fee) từ 50-100 USD/lỗi.")
+    
+    # --- NÚT GỌI AI ---
+    st.markdown("---")
+    if st.button("AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖"):
+        if api_key:
+            # TÍNH TOÁN LẠI ĐỂ LẤY DỮ LIỆU MỚI NHẤT GỬI AI
+            curr_errs = []
+            if ship_date > lc_exp_date: curr_errs.append("Late Shipment")
+            if pres_date > lc_exp_date: curr_errs.append("L/C Expired")
+            if (pres_date - ship_date).days > 21: curr_errs.append("Stale Documents")
+            if inv_amount > (lc_amount * (1 + tolerance/100)): curr_errs.append("Overdrawn")
+            if is_dirty_bl: curr_errs.append("Dirty B/L")
+
+            context = f"""
+            DỮ LIỆU: Ship: {ship_date}, Exp: {lc_exp_date}, Pres: {pres_date}, Inv: {inv_amount}, Dirty B/L: {is_dirty_bl}.
+            LỖI PHÁT HIỆN: {', '.join(curr_errs) if curr_errs else 'None'}.
             """
-            <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
-                © 2026 Designed by Nguyễn Minh Hải
-            </div>
-            """, 
-            unsafe_allow_html=True
-        )
+            
+            task = "Đóng vai chuyên gia UCP 600, giải thích ngắn gọn lỗi và cách khắc phục cho doanh nghiệp."
+            
+            with st.spinner("Đang tham vấn..."):
+                advise = ask_gemini_advisor("Expert", context, task)
+                st.markdown(f'<div class="ai-box">{advise}</div>', unsafe_allow_html=True)
+        else:
+            st.warning("⚠️ Vui lòng nhập API Key.")
+
+    st.markdown("---")
+    st.markdown('<div style="text-align: center; color: #888; font-size: 13px;">© 2026 Designed by Nguyễn Minh Hải</div>', unsafe_allow_html=True)
 # ==============================================================================
 # PHÒNG 4: ĐẦU TƯ QUỐC TẾ
 # ==============================================================================

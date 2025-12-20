@@ -167,7 +167,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("🏦 INTERNATIONAL FINANCE LAB")
-st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế (được thiết kế bởi ThS. Nguyễn Minh Hải")
+st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế")
 
 # --- MENU NAVIGATION (SIDEBAR CHUẨN) ---
 with st.sidebar:
@@ -245,6 +245,15 @@ if "1." in room:
                     2.  Bán ngay số USD đó (để lấy VND trả khách) -> Dùng tỷ giá mua USD của thị trường (tức **USD/VND Bid**).
                 * Do đó, Tỷ giá chéo Bid là tích của 2 tỷ giá Bid thành phần.
                 """)
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
+                © 2026 Designed by Nguyễn Minh Hải
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 
     with tab2:
         st.write("Vốn kinh doanh: **1,000,000 USD**")
@@ -279,7 +288,7 @@ if "1." in room:
                 Cơ hội kinh doanh chênh lệch giá (Arbitrage) xuất hiện khi tỷ giá chéo tính toán (Lý thuyết) khác với tỷ giá chéo thực tế trên thị trường.
                 Trong trường hợp này, dòng tiền chạy theo vòng tròn (USD -> EUR -> VND -> USD) để tận dụng sự định giá sai lệch giữa các ngân hàng.
                 """)
-        
+                
         # --- BỔ SUNG AI CHO PHÒNG 1 ---
         st.markdown("---")
         # Dùng tham số icon="🤖" để render ổn định hơn
@@ -299,7 +308,15 @@ if "1." in room:
                     st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise}</div>', unsafe_allow_html=True)
             else:
                 st.warning("⚠️ Vui lòng nhập API Key.")
-
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style="text-align: center; color: #888; font-size: 13px; margin-top: 10px;">
+                © 2026 Designed by Nguyễn Minh Hải
+            </div>
+            """, 
+            unsafe_allow_html=True
+        )
 # ==============================================================================
 # PHÒNG 2: RISK MANAGEMENT
 # ==============================================================================
@@ -593,4 +610,5 @@ elif "5." in room:
         * Chính phủ/Doanh nghiệp vay bằng USD (Nợ USD) nhưng nguồn thu lại bằng nội tệ (Thuế/Doanh thu VND).
         * Khi nội tệ mất giá, khoản nợ "tự động" phình to ra khi quy đổi, dù số tiền gốc USD không đổi.
         """)
+
 

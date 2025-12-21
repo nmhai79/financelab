@@ -4,3 +4,5 @@ numpy
 google-generativeai
 numpy-financial
 matplotlib
+openpyxl
+

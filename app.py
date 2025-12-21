@@ -705,18 +705,29 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
                 # Cách này giúp hình nét căng dù phóng to
                 svg = graph.pipe(format='svg').decode('utf-8')
                 
-                # 3. Nhúng vào khung HTML có thanh cuộn ngang (overflow-x: auto)
-                # min-width: 600px -> Ép hình luôn rộng ít nhất 600px (lớn hơn màn hình đt) để không bị bóp méo
-                st.markdown(f"""
+                # --- BƯỚC QUAN TRỌNG: LÀM SẠCH SVG ---
+                # Graphviz sinh ra cả dòng <?xml ...> và <!DOCTYPE ...>
+                # Những dòng này khi nhét vào thẻ <div> sẽ gây lỗi hiển thị hoặc hiện code thừa.
+                # Ta chỉ lấy từ đoạn bắt đầu thẻ <svg> trở đi.
+                svg_clean = svg[svg.find("<svg"):]
+
+                # 3. HIỂN THỊ (Lưu ý: f-string để SÁT LỀ TRÁI, KHÔNG thụt dòng)
+                with st.container(border=True):
+                    st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
+                    
+                    # Biến html_content để riêng ra ngoài cho dễ nhìn
+                    # QUAN TRỌNG: Các dòng HTML bên trong KHÔNG được thụt vào quá sâu
+                    html_content = f"""
                 <div style="width: 100%; overflow-x: auto; background-color: white; border-radius: 5px; padding: 10px;">
                     <div style="min-width: 600px;">
-                        {svg}
+                        {svg_clean}
                     </div>
                 </div>
                 <div style="text-align: center; font-size: 12px; color: grey; margin-top: 5px;">
                     👆 <i>Lướt sang phải để xem trọn sơ đồ</i>
                 </div>
-                """, unsafe_allow_html=True)
+                """
+                    st.markdown(html_content, unsafe_allow_html=True)
                 
             except Exception as e:
                 # Fallback: Nếu lỗi thư viện graphviz thì dùng cách cũ

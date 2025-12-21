@@ -6,6 +6,8 @@ import altair as alt
 import streamlit as st
 import google.generativeai as genai
 
+MAX_AI_QUOTA = 5
+
 # 1. Hàm load danh sách sinh viên từ Excel (Chạy 1 lần duy nhất để tiết kiệm RAM)
 @st.cache_resource
 def load_valid_students():
@@ -126,38 +128,47 @@ div[data-testid="stButton"] > button[kind="primary"]:hover{
   box-shadow: 0 6px 14px rgba(255,43,43,.45) !important;
 }
 
-/* SECONDARY (mặc định toàn app): xanh tiền tệ */
-div[data-testid="stButton"] > button[kind="secondary"]{
-  background-color: #28a745 !important;
-  color: #fff !important;
-  border: none !important;
-  border-radius: 10px !important;
-  font-weight: 700 !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,.18) !important;
-}
-div[data-testid="stButton"] > button[kind="secondary"]:hover{
-  background-color: #218838 !important;
-  transform: translateY(-1px) !important;
-  box-shadow: 0 6px 12px rgba(0,0,0,.18) !important;
+/* ========================================================= */
+/* 1. STYLE MẶC ĐỊNH TOÀN APP (Nút Tính toán, Phân tích...)  */
+/* ========================================================= */
+
+/* Secondary mặc định => MÀU XANH (Giống cũ) */
+div[data-testid="stButton"] > button[kind="secondary"] {
+    background-color: #28a745 !important;
+    color: #fff !important;
+    border: none !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,.18) !important;
 }
 
-//* ===== SCENARIO TOGGLE: CHƯA CHỌN => NỀN TRẮNG + VIỀN + CHỮ ĐEN ===== */
-.scenario-toggle div[data-testid="stButton"] > button[kind="secondary"],
-.scenario-toggle div.stButton > button:first-child:not([kind="primary"]) {
-  background-color: #ffffff !important;     /* NỀN TRẮNG (không dùng transparent) */
-  color: #111827 !important;               /* chữ đen */
-  border: 1px solid #d1d5db !important;    /* viền mảnh */
-  box-shadow: none !important;
-  transform: none !important;
+/* Hover của nút xanh */
+div[data-testid="stButton"] > button[kind="secondary"]:hover {
+    background-color: #218838 !important; /* Xanh đậm hơn */
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 12px rgba(0,0,0,.18) !important;
+    color: #fff !important;
 }
 
-/* Hover nhẹ */
-.scenario-toggle div[data-testid="stButton"] > button[kind="secondary"]:hover,
-.scenario-toggle div.stButton > button:first-child:not([kind="primary"]):hover {
-  background-color: #f3f4f6 !important;
-  border-color: #9ca3af !important;
+/* ========================================================= */
+/* 2. NGOẠI LỆ: RIÊNG CÁC NÚT TRONG EXPANDER (Gợi ý kịch bản) */
+/* ========================================================= */
+
+/* Tìm thẻ stExpander chứa nút secondary => Ép thành TRONG SUỐT */
+div[data-testid="stExpander"] div[data-testid="stButton"] > button[kind="secondary"] {
+    background-color: #f8f9fa !important; /* <--- ĐỔI Ở ĐÂY (Xám siêu nhạt chuẩn UI) */
+    color: #333 !important;
+    border: 1px solid #d1d5db !important; /* Đổi viền sang xám lợt hơn chút cho tiệp màu */
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important; /* Thêm tí bóng nhẹ cho đẹp */
 }
 
+/* Hover của nút trong suốt => Hiện màu cam nhạt gợi ý */
+div[data-testid="stExpander"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
+    background-color: #fff3e0 !important;
+    border-color: #ff9800 !important;
+    color: #e65100 !important;
+    transform: none !important; /* Không nảy lên để đỡ rối mắt */
+}
 
 /* -----------------------------
    Cards / Boxes
@@ -419,16 +430,16 @@ with st.sidebar:
             used = tracker.get(input_mssv, 0)
             
             # Đổi màu hiển thị cho sinh động
-            if used < 5:
-                st.caption(f"✅ Đã dùng: **{used}/5** lượt gọi AI.")
+            if used < MAX_AI_QUOTA:
+                st.caption(f"✅ Đã dùng: **{used}/{MAX_AI_QUOTA}** lượt gọi AI.")
             else:
-                st.error(f"⛔ Đã dùng hết: **{used}/5** lượt gọi AI.")
+                st.error(f"⛔ Đã dùng hết: **{used}/{MAX_AI_QUOTA}** lượt gọi AI.")
                 
         else:
             # C. Nhập sai
             st.error("⛔ MSSV không đúng danh sách lớp! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
     else:
-        st.info("Vui lòng nhập MSSV để được kích hoạt AI.")
+        st.info("Vui lòng nhập MSSV để được kích hoạt AI tư vấn.")
 
     # (Tuỳ chọn) nhập API key nhanh nếu chưa có
     if not API_KEY:
@@ -700,8 +711,8 @@ digraph {
             tracker = get_usage_tracker()
             current_used = tracker.get(user_id, 0)
             
-            if current_used >= 5:
-                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI (5/5).")
+            if current_used >= MAX_AI_QUOTA:
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
                 st.stop()
 
             # 3. Chuẩn bị dữ liệu
@@ -716,7 +727,7 @@ digraph {
             task = "Phân tích rủi ro khớp lệnh, chi phí vốn và đưa ra quyết định GO/NO-GO."
 
             # 4. Gọi AI và Xử lý lỗi
-            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/5)"):
+            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
                 try:
                     advise_result = ask_gemini_advisor("Senior FX Trader", context, task)
 
@@ -729,7 +740,7 @@ digraph {
                         st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise_result}</div>', unsafe_allow_html=True)
                         consume_quota(user_id)
                         # Reload nhẹ để cập nhật số hiển thị bên sidebar (nếu cần)
-                        # st.rerun()
+                        st.rerun()
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
@@ -799,7 +810,7 @@ def room_2_risk():
             st.success("📈 Lãi suất VND thấp hơn USD ⇒ VND thường được “cộng điểm” (Forward thấp hơn Spot).")
 
     with col_res_irp2:
-        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ IRP & CÔNG THỨC", expanded=True):
+        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ IRP & CÔNG THỨC", expanded=False):
             st.markdown("#### 1. IRP là gì?")
             st.info(
                 """
@@ -973,6 +984,24 @@ Theo nguyên lý **No Arbitrage**:
 
     st.markdown("---")
     if st.button("AI CFO: Phân tích chuyên sâu", type="primary", icon="🤖", key="btn_ai_cfo"):
+            # BƯỚC 1: KIỂM TRA ĐĂNG NHẬP (Lấy từ Session State)
+            # Lấy ID từ session ra, nếu không có thì trả về None
+        user_id = st.session_state.get('CURRENT_USER') 
+
+        if not user_id:
+            st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
+            st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
+            st.stop() # Dừng lại ngay, không chạy tiếp
+
+            # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
+        tracker = get_usage_tracker()
+        current_used = tracker.get(user_id, 0)
+            
+        if current_used >= MAX_AI_QUOTA:
+            st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
+            st.stop()
+
+            # 3. Chuẩn bị dữ liệu
         context = f"""
 Bài toán: Nợ {debt_amount:,.0f} USD.
 Spot hiện tại: {spot_irp:,.0f}; Kỳ hạn: {days_loan} ngày.
@@ -985,11 +1014,18 @@ Phương án:
 Kết quả máy tính chọn: {best_strat}
 """
         task = "Nhận xét kết quả. Phân tích 'chi phí cơ hội' của Forward và 'giá trị quyền' của Option (trong 3-4 câu)."
-        with st.spinner("Đang phân tích chiến lược..."):
-            advise = ask_gemini_advisor("CFO Expert", context, task)
-            st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
-
-# ... (Phần code cũ kết thúc ở đoạn AI CFO ...)
+        with st.spinner(f"AI đang phân tích chiến lược...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+            try:
+                advise = ask_gemini_advisor("CFO Expert", context, task)
+                if advise.startswith("⚠️"):
+                    st.error(advise) # Hiện lỗi cho GV/SV biết
+                    st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                else:   
+                    consume_quota(user_id)
+                    st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
+                    st.rerun()
+            except Exception as e:
+                st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
     st.markdown("---")
     st.subheader("4. Tình huống nâng cao: Xử lý khi Lệch dòng tiền (Swap)")
@@ -1314,7 +1350,7 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
         with st.expander("🎯 GỢI Ý KỊCH BẢN (Cho phép chọn nhiều lỗi cùng lúc)", expanded=True):
             st.write("Bấm để **Bật/Tắt** tình huống lỗi. (Nút đỏ = đang chọn)")
 
-            st.markdown('<div class="scenario-toggle">', unsafe_allow_html=True)
+            # st.markdown('<div class="scenario-toggle">', unsafe_allow_html=True)
 
             sc1, sc2, sc3, sc4, sc5 = st.columns(5)
 
@@ -1347,7 +1383,7 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
                     reset_scenarios()
                     st.rerun()
 
-            st.markdown("</div>", unsafe_allow_html=True)  # ✅ ĐÓNG DIV ĐÚNG: nằm trong expander
+            # st.markdown("</div>", unsafe_allow_html=True)  # ✅ ĐÓNG DIV ĐÚNG: nằm trong expander
 
 
         st.markdown("---")
@@ -1417,7 +1453,7 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
                 st.warning("👉 Hậu quả: Ngân hàng có quyền **từ chối thanh toán** và thu phí discrepancy (thường 50–100 USD/lỗi).")
 
         st.markdown("---")
-        if st.button("AI Luật sư: Tư vấn UCP 600", type="primary", icon="🤖", key="btn_ai_ucp"):
+        if st.button("AI Lawyer: Tư vấn UCP 600", type="primary", icon="🤖", key="btn_ai_ucp"):
             curr_errs = []
             if ship_date > lc_exp_date:
                 curr_errs.append("Late Shipment")
@@ -1429,6 +1465,21 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
                 curr_errs.append("Overdrawn Credit")
             if is_dirty_bl:
                 curr_errs.append("Unclean B/L")
+
+            user_id = st.session_state.get('CURRENT_USER') 
+
+            if not user_id:
+                st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
+                st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
+                st.stop() # Dừng lại ngay, không chạy tiếp
+
+                # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
+            tracker = get_usage_tracker()
+            current_used = tracker.get(user_id, 0)
+                
+            if current_used >= MAX_AI_QUOTA:
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
+                st.stop()
 
             context = f"""
 Dữ liệu:
@@ -1443,9 +1494,18 @@ Dữ liệu:
 Lỗi phát hiện: {", ".join(curr_errs) if curr_errs else "Không có"}
 """
             task = "Giải thích ngắn gọn các lỗi (nếu có) và 1–2 cách khắc phục thực tế cho doanh nghiệp."
-            with st.spinner("Đang tham vấn chuyên gia UCP 600..."):
-                advise = ask_gemini_advisor("Chuyên gia UCP 600", context, task)
-                st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN UCP 600</h4>{advise}</div>', unsafe_allow_html=True)
+            with st.spinner(f"AI đang tư vấn ... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+                try:
+                    advise = ask_gemini_advisor("Chuyên gia UCP 600", context, task)
+                    if advise.startswith("⚠️"):
+                        st.error(advise) # Hiện lỗi cho GV/SV biết
+                        st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                    else:   
+                        consume_quota(user_id)
+                        st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN UCP 600</h4>{advise}</div>', unsafe_allow_html=True)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
         footer()
 
@@ -1581,7 +1641,7 @@ def room_4_invest():
         with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
             st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
 
-        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=True):
+        with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=False):
             st.markdown("#### 1) NPV điều chỉnh tỷ giá")
             st.markdown("Dòng tiền USD được **quy đổi sang VND theo tỷ giá kỳ vọng** từng năm trước khi chiết khấu.")
             st.latex(
@@ -1589,30 +1649,36 @@ def room_4_invest():
             )
             st.markdown(
                 f"""
-Trong đó:
-- $I_0$ = {inv:,.0f} USD
-- $CF_{{t,USD}}$ = {cf_yearly:,.0f} USD/năm
-- $TV_n$ = {salvage_val:,.0f} USD (chỉ ở năm cuối)
-- $S_t = S_0(1+{depre}\\%)^t$
-"""
+                Trong đó:
+                - $I_0$ = Vốn đầu tư ban đầu ({inv:,.0f} USD).
+                - $CF_{{t,USD}}$ = Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
+                - $TV_n$ = Giá trị thanh lý tài sản chỉ ở năm cuối ({salvage_val:,.0f} USD)
+                - $S_t$ = Tỷ giá dự báo năm t, tính bằng $S_0(1+{depre}\\%)^t$
+                - WACC = Chi phí vốn ({wacc}\\%)
+                """
             )
 
             st.divider()
 
             st.markdown("#### 2) Thời gian hoàn vốn chiết khấu (DPP)")
             st.latex(r"DPP = Y_{negative} + \frac{|PV_{Cumulative}|}{PV_{NextYear}}")
-            if payback_period is not None:
+            if payback_period:
                 y_neg_idx = int(payback_period)
                 try:
                     val_missing = abs(data_cf[y_neg_idx]["Lũy kế PV"])
                     val_next = data_cf[y_neg_idx + 1]["PV (Hiện giá VND)"]
-                    st.latex(
-                        f"DPP = {y_neg_idx} + \\frac{{|{val_missing:,.0f}|}}{{{val_next:,.0f}}} = \\mathbf{{{payback_period:.2f}}}"
-                    )
+                    
+                    st.markdown("👇 **Áp dụng số liệu dự án:**")
+                    st.latex(f"DPP = {y_neg_idx} + \\frac{{|{val_missing:,.0f}|}}{{{val_next:,.0f}}} = \\mathbf{{{payback_period:.2f} \\text{{ Năm}}}}")
+                    
+                    st.info(f"""
+                    💡 **Diễn giải:** * Sau **{y_neg_idx} năm**, dự án vẫn còn lỗ lũy kế **{val_missing:,.0f} VND**. 
+                    * Sang năm thứ **{y_neg_idx + 1}**, dự án kiếm được **{val_next:,.0f} VND**, đủ để bù phần lỗ đó.
+                    """)
                 except Exception:
-                    st.warning("Không hiển thị được phép tính chi tiết DPP (do dữ liệu biên).")
+                    st.warning("Đã hoàn vốn nhưng không hiển thị được chi tiết phép tính.")
             else:
-                st.info("Dự án chưa hoàn vốn ⇒ chưa áp dụng được DPP.")
+                st.info("Dự án chưa hoàn vốn nên không thể áp dụng công thức chi tiết.")
 
             st.divider()
 
@@ -1652,7 +1718,21 @@ Trong đó:
         st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
 
         st.markdown("---")
-        if st.button("AI Chuyên viên: Đánh giá Dự án", type="primary", icon="🤖", key="btn_ai_invest"):
+        if st.button("AI Specialist: Đánh giá Dự án", type="primary", icon="🤖", key="btn_ai_invest"):
+            user_id = st.session_state.get('CURRENT_USER') 
+
+            if not user_id:
+                st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
+                st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
+                st.stop() # Dừng lại ngay, không chạy tiếp
+
+                # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
+            tracker = get_usage_tracker()
+            current_used = tracker.get(user_id, 0)
+                
+            if current_used >= MAX_AI_QUOTA:
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
+                st.stop()
             context = f"""
 Dự án FDI:
 - Vốn: {inv:,.0f} USD; CF/năm: {cf_yearly:,.0f} USD; Thanh lý: {salvage_val:,.0f} USD
@@ -1666,9 +1746,19 @@ Dự án FDI:
 2) Nêu 2 rủi ro tỷ giá/khả năng chuyển lợi nhuận về nước.
 3) Khuyến nghị: Duyệt hay Từ chối (1 câu chốt).
 """
-            with st.spinner("CFO đang phân tích..."):
-                advise = ask_gemini_advisor("CFO Advisor", context, task)
-                st.markdown(f'<div class="ai-box"><h4>🤖 CFO NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
+            with st.spinner(f"Chuyên viên đang phân tích...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+                try:
+                    advise = ask_gemini_advisor("Investment Specialist", context, task)
+                    # advise = ask_gemini_advisor("CFO Advisor", context, task)
+                    if advise.startswith("⚠️"):
+                        st.error(advise) # Hiện lỗi cho GV/SV biết
+                        st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                    else:   
+                        consume_quota(user_id)
+                        st.markdown(f'<div class="ai-box"><h4>🤖 CHUYÊN VIÊN AI NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")        
 
     footer()
 
@@ -1719,10 +1809,12 @@ def room_5_macro():
         m2.metric("Nợ quy đổi ban đầu", f"{base_debt_vnd:,.0f} Tỷ VND")
         m3.metric("Gánh nặng TĂNG THÊM", f"{loss_vnd:,.0f} Tỷ VND", delta="RỦI RO VỠ NỢ", delta_color="inverse")
 
+        # Cảnh báo động
         if shock_pct > 30:
-            st.error("🚨 BÁO ĐỘNG: mức mất giá lớn ⇒ nguy cơ rủi ro nợ/khủng hoảng niềm tin tăng mạnh.")
+            st.error(f"🚨 **BÁO ĐỘNG ĐỎ:** Mức mất giá {shock_pct}% tương đương kịch bản Khủng hoảng Châu Á 1997. Nguy cơ vỡ nợ quốc gia (Sovereign Default) là rất cao.")
         elif shock_pct > 10:
-            st.warning(f"⚠️ Áp lực ngân sách tăng mạnh: nợ tăng thêm khoảng {loss_vnd/1000:,.1f} nghìn tỷ VND.")
+            st.warning(f"⚠️ **Cảnh báo:** Gánh nặng nợ tăng thêm {loss_vnd/1000:,.1f} nghìn tỷ VND sẽ gây áp lực cực lớn lên ngân sách.")
+
 
         with st.expander("🧮 GÓC HỌC TẬP: GIẢI MÃ SỐ LIỆU NỢ CÔNG", expanded=False):
             st.markdown("#### 1) Vì sao nợ tăng dù không vay thêm?")
@@ -1737,13 +1829,26 @@ def room_5_macro():
 """
             )
 
-        with st.expander("📚 BÀI HỌC LỊCH SỬ: KHỦNG HOẢNG 1997"):
-            st.write(
-                """
-Năm 1997, nhiều nền kinh tế có nợ ngoại tệ lớn. Khi nội tệ mất giá mạnh, gánh nợ quy đổi tăng nhanh,
-kéo theo phá sản doanh nghiệp và rủi ro hệ thống tài chính.
-"""
-            )
+        # --- PHẦN MINH HỌA LỊCH SỬ ---
+        with st.expander("📚 BÀI HỌC LỊCH SỬ: KHỦNG HOẢNG TÀI CHÍNH 1997"):
+            c_hist1, c_hist2 = st.columns([1, 2])
+            with c_hist1:
+                st.write("### 📉")
+                st.caption("**Đồng Baht Thái sụp đổ**")
+                # Kích hoạt tìm kiếm hình ảnh biểu đồ khủng hoảng
+                st.markdown("")
+            
+            with c_hist2:
+                st.write("""
+                **Nguyên nhân sụp đổ:**
+                Vào năm 1997, Thái Lan vay nợ nước ngoài rất lớn (giống ví dụ trên). Khi đồng Baht mất giá 50%, gánh nặng nợ quy đổi tăng gấp đôi, khiến các công ty không thể trả nợ và phá sản hàng loạt.
+                """)
+
+        macro_context = f"""
+        Quốc gia nợ {debt_val} tỷ USD. Tỷ giá mất giá {shock_pct}%.
+        Gánh nặng nợ tăng thêm {loss_vnd:,.0f} tỷ VND.
+        So sánh với kịch bản khủng hoảng 1997.
+        """
 
     # TAB 2
     with tab_carry:
@@ -1791,7 +1896,22 @@ Bạn có thể lời đều từ chênh lãi suất, nhưng một cú đảo ch
             )
 
     st.markdown("---")
-    if st.button("AI Chuyên gia: Phân tích Rủi ro & Xu hướng", type="primary", icon="🤖", key="btn_ai_macro"):
+    if st.button("AI Expert: Phân tích Rủi ro & Xu hướng", type="primary", icon="🤖", key="btn_ai_macro"):
+        user_id = st.session_state.get('CURRENT_USER') 
+
+        if not user_id:
+            st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
+            st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
+            st.stop() # Dừng lại ngay, không chạy tiếp
+
+                # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
+        tracker = get_usage_tracker()
+        current_used = tracker.get(user_id, 0)
+                
+        if current_used >= MAX_AI_QUOTA:
+            st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
+            st.stop() 
+
         full_context = f"""
 TÌNH HUỐNG MÔ PHỎNG:
 1) Nợ công: nợ {debt_val} tỷ USD, mất giá {shock_pct}%, nợ tăng thêm {loss_vnd:,.0f} tỷ VND.
@@ -1803,10 +1923,19 @@ Làm báo cáo nhanh:
 2) Đánh giá rủi ro nợ công trong kịch bản mất giá {shock_pct}% (nêu 1-2 dấu hiệu cảnh báo).
 3) Lời khuyên hành động: thiên về Risk-On hay Risk-Off? (1 câu chốt).
 """
-        with st.spinner("Đang tổng hợp tín hiệu vĩ mô..."):
-            advise = ask_gemini_advisor("Macro Strategist", full_context, task)
-            st.markdown(f'<div class="ai-box"><h4>🤖 BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
-
+        with st.spinner(f"Đang tổng hợp tín hiệu vĩ mô... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+            try:
+                advise = ask_gemini_advisor("Macro Strategist", full_context, task)
+                if advise.startswith("⚠️"):
+                    st.error(advise) # Hiện lỗi cho GV/SV biết
+                    st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                else:   
+                    consume_quota(user_id)
+                    st.markdown(f'<div class="ai-box"><h4>🤖 AI BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
+                    st.rerun()
+            except Exception as e:
+                st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
+            
     footer()
 
 

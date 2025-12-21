@@ -993,61 +993,73 @@ Theo nguyên lý **No Arbitrage**:
         )
 
     st.markdown("---")
+    # --- PHẦN NÚT BẤM AI ---
     if st.button("AI CFO: Phân tích chuyên sâu", type="primary", icon="🤖", key="btn_ai_cfo"):
-            # BƯỚC 1: KIỂM TRA ĐĂNG NHẬP (Lấy từ Session State)
-            # Lấy ID từ session ra, nếu không có thì trả về None
+        
+        # BƯỚC 1: LẤY USER ID
         user_id = st.session_state.get('CURRENT_USER') 
 
+        # TRƯỜNG HỢP 1: CHƯA ĐĂNG NHẬP
         if not user_id:
             st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
             st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
-            st.stop() # Dừng lại ngay, không chạy tiếp
+            # QUAN TRỌNG: Không có st.stop() ở đây.
+            # Code sẽ bỏ qua phần 'else' bên dưới và chạy thẳng xuống Mục 4.
 
+        # TRƯỜNG HỢP 2: ĐÃ ĐĂNG NHẬP (Xử lý tiếp Quota và AI trong khối này)
+        else:
             # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-        tracker = get_usage_tracker()
-        current_used = tracker.get(user_id, 0)
+            tracker = get_usage_tracker()
+            current_used = tracker.get(user_id, 0)
             
-        if current_used >= MAX_AI_QUOTA:
-            st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
-        else:          
+            if current_used >= MAX_AI_QUOTA:
+                # Hết lượt -> Báo cảnh báo
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
+            
+            else:
+                # Còn lượt -> Chạy AI (Toàn bộ logic AI nằm trong này)
+                
+                # 3. Chuẩn bị dữ liệu
+                context = f"""
+    Bài toán: Nợ {debt_amount:,.0f} USD.
+    Spot hiện tại: {spot_irp:,.0f}; Kỳ hạn: {days_loan} ngày.
 
-            # 3. Chuẩn bị dữ liệu
-            context = f"""
-Bài toán: Nợ {debt_amount:,.0f} USD.
-Spot hiện tại: {spot_irp:,.0f}; Kỳ hạn: {days_loan} ngày.
+    Phương án:
+    1) Thả nổi @ {future_spot:,.0f} ⇒ {cost_open:,.0f} VND
+    2) Forward @ {f_rate_input:,.0f} ⇒ {cost_fwd:,.0f} VND
+    3) Option: Strike {strike:,.0f} + Premium {premium:,.0f} (tỷ giá hiệu dụng {effective_opt_rate:,.0f}) ⇒ {cost_opt:,.0f} VND
 
-Phương án:
-1) Thả nổi @ {future_spot:,.0f} ⇒ {cost_open:,.0f} VND
-2) Forward @ {f_rate_input:,.0f} ⇒ {cost_fwd:,.0f} VND
-3) Option: Strike {strike:,.0f} + Premium {premium:,.0f} (tỷ giá hiệu dụng {effective_opt_rate:,.0f}) ⇒ {cost_opt:,.0f} VND
-
-Kết quả máy tính chọn: {best_strat}
-"""
-        task = "Nhận xét kết quả. Phân tích 'chi phí cơ hội' của Forward và 'giá trị quyền' của Option (trong 3-4 câu)."
-        with st.spinner(f"AI đang phân tích chiến lược...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
-            try:
-                advise = ask_gemini_advisor("CFO Expert", context, task)
-                if advise.startswith("⚠️"):
-                    st.error(advise) # Hiện lỗi cho GV/SV biết
-                    st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
-                else:
-                        # 1. Trừ quota trong Database/File
-                        consume_quota(user_id)
+    Kết quả máy tính chọn: {best_strat}
+    """
+                task = "Nhận xét kết quả. Phân tích 'chi phí cơ hội' của Forward và 'giá trị quyền' của Option (trong 3-4 câu)."
+                
+                with st.spinner(f"AI đang phân tích chiến lược...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+                    try:
+                        advise = ask_gemini_advisor("CFO Expert", context, task)
                         
-                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
-                        # Lấy số mới để hiển thị
-                        new_usage = current_used + 1
+                        if advise.startswith("⚠️"):
+                            st.error(advise)
+                            st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                        else:
+                            # 1. Trừ quota
+                            consume_quota(user_id)
+                            
+                            # 2. Cập nhật Sidebar (nếu có placeholder)
+                            if 'quota_placeholder' in locals() or 'quota_placeholder' in globals():
+                                new_usage = current_used + 1
+                                quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                            
+                            # 3. Hiện kết quả
+                            st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
                         
-                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
-                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
-                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
-                        
-                        # 3. Hiện kết quả AI ra màn hình chính
-                        st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
-                    
-            except Exception as e:
-                st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
+                    except Exception as e:
+                        st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
+    # =========================================================
+    # MỤC 4 (NẰM NGOÀI MỌI KHỐI IF CỦA BUTTON)
+    # =========================================================
+    # Vì không dùng st.stop() ở trên, nên dù chưa đăng nhập hay lỗi gì
+    # Code vẫn trôi xuống đây và hiển thị mục 4 bình thường.
     st.markdown("---")
     st.subheader("4. Tình huống nâng cao: Xử lý khi Lệch dòng tiền (Swap)")
     

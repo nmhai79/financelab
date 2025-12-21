@@ -439,7 +439,7 @@ with st.sidebar:
                 
         else:
             # C. Nhập sai
-            st.error("⛔ MSSV không thuộc danh sách lớp! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
+            st.error("⛔ Danh sách lớp không có MSSV này! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
     else:
         st.info("Vui lòng nhập MSSV để được kích hoạt AI tư vấn.")
 
@@ -2006,3 +2006,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

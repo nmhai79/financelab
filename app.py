@@ -675,59 +675,26 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
 """
                 )
 
-        import graphviz 
-
-# --- CODE XỬ LÝ BIỂU ĐỒ ---
-# (Đặt đoạn này vào đúng vị trí trong logic của bạn)
-
-        dot_code = """
-        digraph {
-            rankdir=LR;
-            node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
-            edge [color="#555555", fontname="Arial", fontsize=10];
-
-            MarketA [label="📉 Thị trường A\\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
-            MarketB [label="📈 Thị trường B\\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
-            Wallet [label="💰 TÚI TIỀN\\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
-
-            MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
-            MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
-        }
-        """
-
+        # Minh họa (cố định, tránh lệch)
         with st.container(border=True):
             st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
-            
-            try:
-                # 1. Tạo đối tượng graphviz
-                graph = graphviz.Source(dot_code)
-                
-                # 2. Chuyển sang SVG
-                svg = graph.pipe(format='svg').decode('utf-8')
-                
-                # 3. Làm sạch SVG (Cắt bỏ phần header XML gây lỗi)
-                svg_clean = svg[svg.find("<svg"):]
+            st.graphviz_chart(
+                """
+digraph {
+    rankdir=LR;
+    node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
+    edge [color="#555555", fontname="Arial", fontsize=10];
 
-                # 4. TẠO HTML (QUAN TRỌNG NHẤT: SÁT LỀ TRÁI)
-        # Lưu ý: Các dòng <div...> dưới đây tôi đã xóa hết khoảng trắng đầu dòng.
-        # Đừng thụt chúng vào cho đẹp, nếu thụt vào là lỗi ngay.
-                html_content = f"""
-<div style="width: 100%; overflow-x: auto; background-color: white; border-radius: 5px; padding: 10px;">
-<div style="min-width: 600px;">
-{svg_clean}
-</div>
-</div>
-<div style="text-align: center; font-size: 12px; color: grey; margin-top: 5px;">
-👆 <i>Lướt sang phải để xem trọn sơ đồ</i>
-</div>
-"""
-        # 5. Render
-                st.markdown(html_content, unsafe_allow_html=True)
-        
-            except Exception as e:
-                # Fallback nếu lỗi (ví dụ chưa cài graphviz)
-                st.error(f"Không thể hiển thị dạng cuộn: {e}")
-                st.graphviz_chart(dot_code)
+    MarketA [label="📉 Thị trường A\\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
+    MarketB [label="📈 Thị trường B\\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
+    Wallet [label="💰 TÚI TIỀN\\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
+
+    MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
+    MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
+}
+""",
+                use_container_width=True,
+            )
             st.info("💡 Dễ hiểu: mua ở nơi rẻ hơn và bán ngay ở nơi đắt hơn, trước khi giá kịp điều chỉnh.")
 
         # AI

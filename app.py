@@ -407,6 +407,9 @@ with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=50)
     st.markdown("### 🎓 Cổng Lab")
     
+    # [QUAN TRỌNG] Tạo một cái hộp rỗng và gán vào biến 'quota_placeholder'
+    quota_placeholder = st.empty()
+
     # 1. Nhập liệu
     # Dùng key='login_mssv' để Streamlit tự nhớ giá trị trong ô input
     input_mssv = st.text_input("Nhập MSSV kích hoạt AI:", key="login_mssv").strip()
@@ -427,17 +430,17 @@ with st.sidebar:
             
             # B. Hiển thị số lượt đã dùng ngay tại đây cho SV thấy
             tracker = get_usage_tracker()
-            used = tracker.get(input_mssv, 0)
+            current_used = tracker.get(input_mssv, 0)
             
             # Đổi màu hiển thị cho sinh động
-            if used < MAX_AI_QUOTA:
-                st.caption(f"✅ Đã dùng: **{used}/{MAX_AI_QUOTA}** lượt gọi AI.")
+            if current_used < MAX_AI_QUOTA:
+                quota_placeholder.caption(f"✅ Đã dùng: **{current_used}/{MAX_AI_QUOTA}** lượt gọi AI.")
             else:
-                st.error(f"⛔ Đã dùng hết: **{used}/{MAX_AI_QUOTA}** lượt gọi AI.")
+                quota_placeholder.error(f"⛔ Đã dùng hết: **{current_used}/{MAX_AI_QUOTA}** lượt gọi AI.")
                 
         else:
             # C. Nhập sai
-            st.error("⛔ MSSV không đúng danh sách lớp! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
+            st.error("⛔ MSSV không thuộc danh sách lớp! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
     else:
         st.info("Vui lòng nhập MSSV để được kích hoạt AI tư vấn.")
 
@@ -736,11 +739,19 @@ digraph {
                         st.error(advise_result) # Hiện lỗi cho GV/SV biết
                         st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
                     else:
-                        # Thành công thì mới hiện kết quả và trừ lượt
-                        st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise_result}</div>', unsafe_allow_html=True)
+                        # 1. Trừ quota trong Database/File
                         consume_quota(user_id)
-                        # Reload nhẹ để cập nhật số hiển thị bên sidebar (nếu cần)
-                        st.rerun()
+                        
+                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
+                        # Lấy số mới để hiển thị
+                        new_usage = current_used + 1
+                        
+                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
+                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
+                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                        
+                        # 3. Hiện kết quả AI ra màn hình chính
+                        st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise_result}</div>', unsafe_allow_html=True)                        
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
@@ -1020,10 +1031,21 @@ Kết quả máy tính chọn: {best_strat}
                 if advise.startswith("⚠️"):
                     st.error(advise) # Hiện lỗi cho GV/SV biết
                     st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
-                else:   
-                    consume_quota(user_id)
-                    st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
-                    st.rerun()
+                else:
+                        # 1. Trừ quota trong Database/File
+                        consume_quota(user_id)
+                        
+                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
+                        # Lấy số mới để hiển thị
+                        new_usage = current_used + 1
+                        
+                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
+                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
+                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                        
+                        # 3. Hiện kết quả AI ra màn hình chính
+                        st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
+                    
             except Exception as e:
                 st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
@@ -1500,10 +1522,21 @@ Lỗi phát hiện: {", ".join(curr_errs) if curr_errs else "Không có"}
                     if advise.startswith("⚠️"):
                         st.error(advise) # Hiện lỗi cho GV/SV biết
                         st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
-                    else:   
+                    else:
+                        # 1. Trừ quota trong Database/File
                         consume_quota(user_id)
+                        
+                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
+                        # Lấy số mới để hiển thị
+                        new_usage = current_used + 1
+                        
+                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
+                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
+                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                        
+                        # 3. Hiện kết quả AI ra màn hình chính
                         st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN UCP 600</h4>{advise}</div>', unsafe_allow_html=True)
-                        st.rerun()
+                        
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
@@ -1753,10 +1786,21 @@ Dự án FDI:
                     if advise.startswith("⚠️"):
                         st.error(advise) # Hiện lỗi cho GV/SV biết
                         st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
-                    else:   
+                    else:
+                        # 1. Trừ quota trong Database/File
                         consume_quota(user_id)
+                        
+                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
+                        # Lấy số mới để hiển thị
+                        new_usage = current_used + 1
+                        
+                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
+                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
+                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                        
+                        # 3. Hiện kết quả AI ra màn hình chính
                         st.markdown(f'<div class="ai-box"><h4>🤖 CHUYÊN VIÊN AI NHẬN ĐỊNH</h4>{advise}</div>', unsafe_allow_html=True)
-                        st.rerun()
+                        
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")        
 
@@ -1929,10 +1973,21 @@ Làm báo cáo nhanh:
                 if advise.startswith("⚠️"):
                     st.error(advise) # Hiện lỗi cho GV/SV biết
                     st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
-                else:   
-                    consume_quota(user_id)
-                    st.markdown(f'<div class="ai-box"><h4>🤖 AI BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
-                    st.rerun()
+                else:
+                        # 1. Trừ quota trong Database/File
+                        consume_quota(user_id)
+                        
+                        # 2. CẬP NHẬT SIDEBAR NGAY LẬP TỨC (Không cần Rerun)
+                        # Lấy số mới để hiển thị
+                        new_usage = current_used + 1
+                        
+                        # Bắn nội dung mới vào cái hộp "quota_placeholder" đang nằm bên Sidebar
+                        # Lưu ý: Bạn cần đảm bảo biến 'quota_placeholder' truy cập được từ đây
+                        quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
+                        
+                        # 3. Hiện kết quả AI ra màn hình chính
+                        st.markdown(f'<div class="ai-box"><h4>🤖 AI BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
+                    
             except Exception as e:
                 st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
             

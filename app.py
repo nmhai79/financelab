@@ -675,9 +675,11 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
 """
                 )
 
-        import graphviz  # Cần import thư viện này (thường có sẵn khi cài streamlit)
+        import graphviz 
 
-        # Nội dung biểu đồ (Giữ nguyên logic của bạn)
+        # --- CODE XỬ LÝ BIỂU ĐỒ ---
+        # (Đặt đoạn này vào đúng vị trí trong logic của bạn)
+
         dot_code = """
         digraph {
             rankdir=LR;
@@ -693,7 +695,6 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
         }
         """
 
-        # --- CÁCH HIỂN THỊ MỚI (HỖ TRỢ MOBILE) ---
         with st.container(border=True):
             st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
             
@@ -701,37 +702,33 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
                 # 1. Tạo đối tượng graphviz
                 graph = graphviz.Source(dot_code)
                 
-                # 2. Chuyển đổi thành mã SVG (Hình ảnh vector)
-                # Cách này giúp hình nét căng dù phóng to
+                # 2. Chuyển sang SVG
                 svg = graph.pipe(format='svg').decode('utf-8')
                 
-                # --- BƯỚC QUAN TRỌNG: LÀM SẠCH SVG ---
-                # Graphviz sinh ra cả dòng <?xml ...> và <!DOCTYPE ...>
-                # Những dòng này khi nhét vào thẻ <div> sẽ gây lỗi hiển thị hoặc hiện code thừa.
-                # Ta chỉ lấy từ đoạn bắt đầu thẻ <svg> trở đi.
+                # 3. Làm sạch SVG (Cắt bỏ phần header XML gây lỗi)
                 svg_clean = svg[svg.find("<svg"):]
 
-                # 3. HIỂN THỊ (Lưu ý: f-string để SÁT LỀ TRÁI, KHÔNG thụt dòng)
-                with st.container(border=True):
-                    st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
-                    
-                    # Biến html_content để riêng ra ngoài cho dễ nhìn
-                    # QUAN TRỌNG: Các dòng HTML bên trong KHÔNG được thụt vào quá sâu
-                    html_content = f"""
-                <div style="width: 100%; overflow-x: auto; background-color: white; border-radius: 5px; padding: 10px;">
-                    <div style="min-width: 600px;">
-                        {svg_clean}
-                    </div>
-                </div>
-                <div style="text-align: center; font-size: 12px; color: grey; margin-top: 5px;">
-                    👆 <i>Lướt sang phải để xem trọn sơ đồ</i>
-                </div>
-                """
-                    st.markdown(html_content, unsafe_allow_html=True)
+                # 4. TẠO HTML (QUAN TRỌNG NHẤT: SÁT LỀ TRÁI)
+                # Lưu ý: Các dòng <div...> dưới đây tôi đã xóa hết khoảng trắng đầu dòng.
+                # Đừng thụt chúng vào cho đẹp, nếu thụt vào là lỗi ngay.
+                html_content = f"""
+        <div style="width: 100%; overflow-x: auto; background-color: white; border-radius: 5px; padding: 10px;">
+        <div style="min-width: 600px;">
+        {svg_clean}
+        </div>
+        </div>
+        <div style="text-align: center; font-size: 12px; color: grey; margin-top: 5px;">
+        👆 <i>Lướt sang phải để xem trọn sơ đồ</i>
+        </div>
+        """
+                # 5. Render
+                st.markdown(html_content, unsafe_allow_html=True)
                 
             except Exception as e:
-                # Fallback: Nếu lỗi thư viện graphviz thì dùng cách cũ
-                st.graphviz_chart(dot_code, use_container_width=True)
+                # Fallback nếu lỗi (ví dụ chưa cài graphviz)
+                st.error(f"Không thể hiển thị dạng cuộn: {e}")
+                st.graphviz_chart(dot_code)
+            
             st.info("💡 Dễ hiểu: mua ở nơi rẻ hơn và bán ngay ở nơi đắt hơn, trước khi giá kịp điều chỉnh.")
 
         # AI

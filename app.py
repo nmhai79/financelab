@@ -675,26 +675,52 @@ Nếu chênh lệch đủ lớn, đi một vòng sẽ “đẻ” ra lợi nhu�
 """
                 )
 
-        # Minh họa (cố định, tránh lệch)
+        import graphviz  # Cần import thư viện này (thường có sẵn khi cài streamlit)
+
+        # Nội dung biểu đồ (Giữ nguyên logic của bạn)
+        dot_code = """
+        digraph {
+            rankdir=LR;
+            node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
+            edge [color="#555555", fontname="Arial", fontsize=10];
+
+            MarketA [label="📉 Thị trường A\\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
+            MarketB [label="📈 Thị trường B\\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
+            Wallet [label="💰 TÚI TIỀN\\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
+
+            MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
+            MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
+        }
+        """
+
+        # --- CÁCH HIỂN THỊ MỚI (HỖ TRỢ MOBILE) ---
         with st.container(border=True):
             st.markdown("##### 🔄 Minh họa dòng tiền kiếm lời:")
-            st.graphviz_chart(
-                """
-digraph {
-    rankdir=LR;
-    node [fontname="Arial", shape=box, style="filled,rounded", fillcolor="#f0f2f6", color="#d1d5db"];
-    edge [color="#555555", fontname="Arial", fontsize=10];
-
-    MarketA [label="📉 Thị trường A\\n(Giá Thấp)", fillcolor="#e8f5e9", color="#4caf50", penwidth=2];
-    MarketB [label="📈 Thị trường B\\n(Giá Cao)", fillcolor="#ffebee", color="#f44336", penwidth=2];
-    Wallet [label="💰 TÚI TIỀN\\n(Lợi nhuận)", shape=ellipse, fillcolor="#fff9c4", color="#fbc02d", style=filled];
-
-    MarketA -> MarketB [label="1. Mua thấp & Chuyển sang", color="#4caf50", penwidth=2];
-    MarketB -> Wallet [label="2. Bán cao & Chốt lời", color="#f44336", penwidth=2];
-}
-""",
-                use_container_width=True,
-            )
+            
+            try:
+                # 1. Tạo đối tượng graphviz
+                graph = graphviz.Source(dot_code)
+                
+                # 2. Chuyển đổi thành mã SVG (Hình ảnh vector)
+                # Cách này giúp hình nét căng dù phóng to
+                svg = graph.pipe(format='svg').decode('utf-8')
+                
+                # 3. Nhúng vào khung HTML có thanh cuộn ngang (overflow-x: auto)
+                # min-width: 600px -> Ép hình luôn rộng ít nhất 600px (lớn hơn màn hình đt) để không bị bóp méo
+                st.markdown(f"""
+                <div style="width: 100%; overflow-x: auto; background-color: white; border-radius: 5px; padding: 10px;">
+                    <div style="min-width: 600px;">
+                        {svg}
+                    </div>
+                </div>
+                <div style="text-align: center; font-size: 12px; color: grey; margin-top: 5px;">
+                    👆 <i>Lướt sang phải để xem trọn sơ đồ</i>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            except Exception as e:
+                # Fallback: Nếu lỗi thư viện graphviz thì dùng cách cũ
+                st.graphviz_chart(dot_code, use_container_width=True)
             st.info("💡 Dễ hiểu: mua ở nơi rẻ hơn và bán ngay ở nơi đắt hơn, trước khi giá kịp điều chỉnh.")
 
         # AI

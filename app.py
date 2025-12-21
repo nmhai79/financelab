@@ -1732,7 +1732,7 @@ def room_4_invest():
             st.markdown(f"Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.")
 
         st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
-        st.markdown("Kiểm tra NPV khi **WACC** và **mức mất giá VND** thay đổi. Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?")
+        st.markdown("Kiểm tra NPV khi **WACC** và **mức mất giá VND** thay đổi. Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. Ma trận bên dưới (Sensitivity Matrix) giúp trả lời câu hỏi: Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?")
 
 
         wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
@@ -2019,3 +2019,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

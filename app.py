@@ -419,16 +419,16 @@ with st.sidebar:
             used = tracker.get(input_mssv, 0)
             
             # Đổi màu hiển thị cho sinh động
-            if used < 3:
-                st.caption(f"✅ Đã dùng: **{used}/3** lượt")
+            if used < 5:
+                st.caption(f"✅ Đã dùng: **{used}/5** lượt gọi AI.")
             else:
-                st.error(f"⛔ Đã dùng hết: **{used}/3** lượt")
+                st.error(f"⛔ Đã dùng hết: **{used}/5** lượt gọi AI.")
                 
         else:
             # C. Nhập sai
-            st.error("⛔ MSSV không đúng danh sách lớp!")
+            st.error("⛔ MSSV không đúng danh sách lớp! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
     else:
-        st.info("Vui lòng nhập MSSV.")
+        st.info("Vui lòng nhập MSSV để được kích hoạt AI.")
 
     # (Tuỳ chọn) nhập API key nhanh nếu chưa có
     if not API_KEY:
@@ -700,8 +700,8 @@ digraph {
             tracker = get_usage_tracker()
             current_used = tracker.get(user_id, 0)
             
-            if current_used >= 3:
-                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI (3/3).")
+            if current_used >= 5:
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI (5/5).")
                 st.stop()
 
             # 3. Chuẩn bị dữ liệu
@@ -716,7 +716,7 @@ digraph {
             task = "Phân tích rủi ro khớp lệnh, chi phí vốn và đưa ra quyết định GO/NO-GO."
 
             # 4. Gọi AI và Xử lý lỗi
-            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/3)"):
+            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/5)"):
                 try:
                     advise_result = ask_gemini_advisor("Senior FX Trader", context, task)
 
@@ -1823,4 +1823,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

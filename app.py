@@ -1009,10 +1009,10 @@ Theo nguyên lý **No Arbitrage**:
             
         if current_used >= MAX_AI_QUOTA:
             st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
-            st.stop()
+        else:          
 
             # 3. Chuẩn bị dữ liệu
-        context = f"""
+            context = f"""
 Bài toán: Nợ {debt_amount:,.0f} USD.
 Spot hiện tại: {spot_irp:,.0f}; Kỳ hạn: {days_loan} ngày.
 
@@ -2006,4 +2006,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

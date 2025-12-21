@@ -5,5 +5,4 @@ google-generativeai
 numpy-financial
 matplotlib
 openpyxl
-graphviz
 

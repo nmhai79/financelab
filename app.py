@@ -405,10 +405,7 @@ st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế với
 with st.sidebar:
 
     st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=50)
-    st.markdown("### 🎓 Cổng Lab")
-    
-    # [QUAN TRỌNG] Tạo một cái hộp rỗng và gán vào biến 'quota_placeholder'
-    quota_placeholder = st.empty()
+    st.markdown("### 🎓 Cổng Lab")      
 
     # 1. Nhập liệu
     # Dùng key='login_mssv' để Streamlit tự nhớ giá trị trong ô input
@@ -428,6 +425,8 @@ with st.sidebar:
             
             st.success(f"Xin chào: {input_mssv}")
             
+            # [QUAN TRỌNG] Tạo một cái hộp rỗng và gán vào biến 'quota_placeholder'
+            quota_placeholder = st.empty()
             # B. Hiển thị số lượt đã dùng ngay tại đây cho SV thấy
             tracker = get_usage_tracker()
             current_used = tracker.get(input_mssv, 0)

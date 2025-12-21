@@ -6,6 +6,68 @@ import altair as alt
 import streamlit as st
 import google.generativeai as genai
 
+# 1. Hàm load danh sách sinh viên từ Excel (Chạy 1 lần duy nhất để tiết kiệm RAM)
+@st.cache_resource
+def load_valid_students():
+    try:
+        # Đọc file Excel, giả sử cột chứa mã số tên là 'MSSV'
+        # dtype=str để đảm bảo số 0 ở đầu không bị mất (VD: 0901...)
+        df = pd.read_excel("dssv.xlsx", dtype=str)
+        # Chuyển thành list và xóa khoảng trắng thừa
+        valid_ids = df['MSSV'].str.strip().tolist()
+        return valid_ids
+    except Exception as e:
+        st.error(f"⚠️ Lỗi không đọc được file dssv.xlsx: {e}")
+        return []
+
+# 2. Hàm quản lý đếm lượt dùng (Database tạm trên RAM server)
+@st.cache_resource
+def get_usage_tracker():
+    # Cấu trúc: {'MSSV_A': 0, 'MSSV_B': 2}
+    return {}
+
+def verify_and_check_quota(student_id, max_limit=3):
+    """
+    Hàm này trả về 3 trạng thái:
+    - "INVALID": MSSV không có trong file Excel
+    - "LIMIT_REACHED": Có trong file nhưng hết lượt
+    - "OK": Hợp lệ và còn lượt (sẽ tự động trừ 1 lượt)
+    """
+    # Load danh sách hợp lệ
+    valid_list = load_valid_students()
+    
+    # Chuẩn hóa input (chữ thường/hoa, xóa khoảng trắng)
+    clean_id = str(student_id).strip()
+    
+    # A. Kiểm tra có trong danh sách không
+    if clean_id not in valid_list:
+        return "INVALID", 0
+    
+    # B. Kiểm tra hạn mức
+    tracker = get_usage_tracker()
+    
+    # Nếu chưa dùng lần nào thì tạo mới = 0
+    if clean_id not in tracker:
+        tracker[clean_id] = 0
+        
+    current_usage = tracker[clean_id]
+    
+    if current_usage >= max_limit:
+        return "LIMIT_REACHED", current_usage
+    
+    # C. Nếu OK thì tăng đếm và cho phép
+    # Lưu ý: Chỉ gọi hàm này khi CHẮC CHẮN thực hiện lệnh AI
+    return "OK", current_usage
+
+def consume_quota(student_id):
+    """Gọi hàm này sau khi AI chạy thành công để trừ lượt"""
+    clean_id = str(student_id).strip()
+    tracker = get_usage_tracker()
+    if clean_id in tracker:
+        tracker[clean_id] += 1
+    else:
+        tracker[clean_id] = 1
+
 # ==============================================================================
 # 0) PAGE CONFIG
 # ==============================================================================
@@ -322,7 +384,43 @@ st.caption("Hệ thống Mô phỏng Nghiệp vụ Tài chính Quốc tế với
 # 4) SIDEBAR NAV + API KEY INPUT (OPTIONAL)
 # ==============================================================================
 with st.sidebar:
-    st.header("🏢 MÔ PHỎNG NGHIỆP VỤ")
+
+    st.image("https://cdn-icons-png.flaticon.com/512/3135/3135715.png", width=50)
+    st.markdown("### 🎓 Cổng Lab")
+    
+    # 1. Nhập liệu
+    # Dùng key='login_mssv' để Streamlit tự nhớ giá trị trong ô input
+    input_mssv = st.text_input("Nhập MSSV kích hoạt AI:", key="login_mssv").strip()
+    
+    # 2. Xử lý logic xác thực
+    valid_list = load_valid_students() # Hàm load Excel (đã có ở trên)
+    
+    # Mặc định là chưa đăng nhập
+    st.session_state['CURRENT_USER'] = None 
+    
+    if input_mssv:
+        # Kiểm tra xem có trong danh sách lớp không
+        if input_mssv in valid_list:
+            # A. Đăng nhập thành công -> Lưu vào Session State (QUAN TRỌNG)
+            st.session_state['CURRENT_USER'] = input_mssv
+            
+            st.success(f"Xin chào: {input_mssv}")
+            
+            # B. Hiển thị số lượt đã dùng ngay tại đây cho SV thấy
+            tracker = get_usage_tracker()
+            used = tracker.get(input_mssv, 0)
+            
+            # Đổi màu hiển thị cho sinh động
+            if used < 3:
+                st.caption(f"✅ Đã dùng: **{used}/3** lượt")
+            else:
+                st.error(f"⛔ Đã dùng hết: **{used}/3** lượt")
+                
+        else:
+            # C. Nhập sai
+            st.error("⛔ MSSV không đúng danh sách lớp!")
+    else:
+        st.info("Vui lòng nhập MSSV.")
 
     # (Tuỳ chọn) nhập API key nhanh nếu chưa có
     if not API_KEY:
@@ -333,7 +431,8 @@ with st.sidebar:
                 API_KEY = key_in
                 genai.configure(api_key=API_KEY)
                 st.success("Đã nạp API Key cho phiên chạy hiện tại.")
-
+    st.markdown("---")
+    st.header("🏢 SƠ ĐỒ TỔ CHỨC")
     st.write("Di chuyển đến:")
 
     room = st.radio(
@@ -579,24 +678,52 @@ digraph {
 
         # AI
         st.markdown("---")
-        if st.button("AI Trader: Đánh giá rủi ro", type="primary", icon="🤖", key="btn_ai_fx"):
+        if st.button("AI Trader: Phân tích rủi ro", type="primary", icon="🤖", key="btn_ai_risk"):
+            # BƯỚC 1: KIỂM TRA ĐĂNG NHẬP (Lấy từ Session State)
+            # Lấy ID từ session ra, nếu không có thì trả về None
+            user_id = st.session_state.get('CURRENT_USER') 
+
+            if not user_id:
+                st.error("🔒 Bạn chưa đăng nhập đúng MSSV ở thanh bên trái!")
+                st.toast("Vui lòng nhập MSSV để tiếp tục!", icon="🔒")
+                st.stop() # Dừng lại ngay, không chạy tiếp
+
+            # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
+            tracker = get_usage_tracker()
+            current_used = tracker.get(user_id, 0)
+            
+            if current_used >= 3:
+                st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI (3/3).")
+                st.stop()
+
+            # 3. Chuẩn bị dữ liệu
             context = f"""
-Tình huống: Arbitrage Tam giác.
-- Vốn: {capital:,.0f} USD
-- Tỷ giá: A(USD/VND)={bank_a}, B(EUR/USD)={bank_b}, C(EUR/VND)={bank_c}
-- Kết quả tốt nhất: {best_direction}
-- Lợi nhuận lý thuyết: {best_profit:,.2f} USD
-- Tỷ giá cân bằng gợi ý cho C: {fair_rate_c:,.0f}
-"""
-            task = """
-Phân tích ngắn gọn:
-1) Rủi ro thực tế khi khớp 3 lệnh liên tiếp (độ trễ/latency, trượt giá/slippage, độ sâu thị trường).
-2) Với lợi nhuận dự kiến này, có đáng so với phí giao dịch/chi phí vốn không?
-3) Chốt quyết định: GO hay NO-GO (kèm 1 câu lý do).
-"""
-            with st.spinner(f"AI đang phân tích cơ hội với vốn {capital:,.0f} USD..."):
-                advise = ask_gemini_advisor("Senior FX Trader", context, task)
-                st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise}</div>', unsafe_allow_html=True)
+            Tình huống: Arbitrage Tam giác.
+            - Vốn: {capital:,.0f} USD
+            - Tỷ giá: A={bank_a}, B={bank_b}, C={bank_c}
+            - Kết quả: {best_direction}
+            - Lợi nhuận: {best_profit:,.2f} USD
+            """
+            
+            task = "Phân tích rủi ro khớp lệnh, chi phí vốn và đưa ra quyết định GO/NO-GO."
+
+            # 4. Gọi AI và Xử lý lỗi
+            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/3)"):
+                try:
+                    advise_result = ask_gemini_advisor("Senior FX Trader", context, task)
+
+                    # KIỂM TRA: Nếu kết quả trả về bắt đầu bằng ⚠️ nghĩa là có lỗi
+                    if advise_result.startswith("⚠️"):
+                        st.error(advise_result) # Hiện lỗi cho GV/SV biết
+                        st.info("Lượt này chưa bị trừ do lỗi hệ thống.")
+                    else:
+                        # Thành công thì mới hiện kết quả và trừ lượt
+                        st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise_result}</div>', unsafe_allow_html=True)
+                        consume_quota(user_id)
+                        # Reload nhẹ để cập nhật số hiển thị bên sidebar (nếu cần)
+                        # st.rerun()
+                except Exception as e:
+                    st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
     footer()
 
@@ -853,6 +980,83 @@ Kết quả máy tính chọn: {best_strat}
         with st.spinner("Đang phân tích chiến lược..."):
             advise = ask_gemini_advisor("CFO Expert", context, task)
             st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
+
+# ... (Phần code cũ kết thúc ở đoạn AI CFO ...)
+
+    st.markdown("---")
+    st.subheader("4. Tình huống nâng cao: Xử lý khi Lệch dòng tiền (Swap)")
+    
+    with st.expander("🔄 MỞ RỘNG: Dòng tiền bị trễ hạn, phải làm sao?", expanded=False):
+        st.markdown(
+            """
+            <div class="mission-text">
+            🚨 <b>Tình huống:</b> Hợp đồng Forward cũ đã đến ngày đáo hạn, nhưng đối tác báo 
+            <b>delay thanh toán thêm 30 ngày</b> nữa. Bạn chưa cần USD ngay lúc này, nhưng ngân hàng bắt buộc tất toán Deal cũ.
+            <br>👉 <b>Giải pháp:</b> Dùng <b>FX Swap</b> (Bán Spot tất toán cũ - Mua Forward kỳ hạn mới).
+            </div>
+            """, unsafe_allow_html=True
+        )
+
+        c_swap1, c_swap2 = st.columns(2)
+        with c_swap1:
+            delay_days = st.number_input("Số ngày delay:", value=30, step=15, key="swap_days")
+            # Giả định Spot tại thời điểm đáo hạn Deal cũ
+            spot_at_maturity = st.number_input(
+                "Spot rate tại ngày đáo hạn Deal cũ:", 
+                value=spot_irp, # Lấy tạm giá hiện tại làm ví dụ
+                help="Giá thị trường tại thời điểm Deal cũ hết hạn",
+                key="swap_spot_mat"
+            )
+        
+        with c_swap2:
+            # Tính lại Forward mới cho kỳ hạn delay
+            # Công thức đơn giản hóa giả định lãi suất không đổi
+            num_swap = 1 + (r_vnd / 100) * (delay_days / 360)
+            den_swap = 1 + (r_usd / 100) * (delay_days / 360)
+            new_fwd_rate = spot_at_maturity * (num_swap / den_swap)
+            
+            st.metric("Tỷ giá Forward mới (cho kỳ hạn delay)", f"{new_fwd_rate:,.0f} VND")
+            swap_points_new = new_fwd_rate - spot_at_maturity
+            st.metric("Điểm Swap (Swap Point)", f"{swap_points_new:,.0f} VND")
+
+        st.markdown("#### 🧮 Hạch toán chi phí Swap (Rollover)")
+        
+        # 1. Tất toán Deal cũ: Mua Forward giá f_rate_input, giờ bán lại giá Spot thị trường (spot_at_maturity)
+        # Nếu Spot < Forward cũ => Lỗ (vì cam kết mua cao, giờ bán ra thấp)
+        settlement_pl = (spot_at_maturity - f_rate_input) * debt_amount
+        
+        # 2. Chi phí giữ trạng thái thêm X ngày (Swap cost)
+        # Chênh lệch lãi suất thể hiện qua Swap Point
+        swap_cost_total = swap_points_new * debt_amount
+
+        col_cal1, col_cal2 = st.columns(2)
+        
+        with col_cal1:
+            st.markdown("**1. Tất toán Deal cũ (Realized P/L):**")
+            st.latex(r"\text{P/L} = (S_{maturity} - F_{old}) \times \text{Volume}")
+            st.write(f"= ({spot_at_maturity:,.0f} - {f_rate_input:,.0f}) × {debt_amount:,.0f}")
+            if settlement_pl >= 0:
+                st.success(f"💰 Lãi từ chênh lệch giá: {settlement_pl:,.0f} VND")
+            else:
+                st.error(f"💸 Lỗ tất toán vị thế cũ: {settlement_pl:,.0f} VND")
+        
+        with col_cal2:
+            st.markdown("**2. Chi phí Swap (Time Value):**")
+            st.latex(r"\text{Cost} = \text{Swap Point} \times \text{Volume}")
+            st.write(f"= ({new_fwd_rate:,.0f} - {spot_at_maturity:,.0f}) × {debt_amount:,.0f}")
+            
+            if swap_points_new > 0:
+                 st.warning(f"📉 Bạn phải trả thêm (VND lãi cao hơn USD): {swap_cost_total:,.0f} VND")
+            else:
+                 st.success(f"📈 Bạn được nhận thêm (Swap Point âm): {abs(swap_cost_total):,.0f} VND")
+
+        total_swap_impact = settlement_pl - swap_cost_total # P/L cũ - Chi phí Swap mới (tùy convention, ở đây để đơn giản ta cộng gộp)
+        
+        st.info(
+            f"""
+            💡 **Bài học:** Khi gia hạn nợ bằng Swap, bạn không chỉ quan tâm tỷ giá mới, mà phải xử lý phần chênh lệch (Lãi/Lỗ) của hợp đồng cũ ngay lập tức.
+            """
+        )
 
     footer()
 

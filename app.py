@@ -10,14 +10,22 @@ import google.generativeai as genai
 @st.cache_resource
 def load_valid_students():
     try:
-        # Đọc file Excel, giả sử cột chứa mã số tên là 'MSSV'
-        # dtype=str để đảm bảo số 0 ở đầu không bị mất (VD: 0901...)
-        df = pd.read_excel("dssv.xlsx", dtype=str)
-        # Chuyển thành list và xóa khoảng trắng thừa
+        # 1. Lấy đường dẫn của file code hiện tại (app.py)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        
+        # 2. Tạo đường dẫn tuyệt đối đến file Excel
+        # Nó sẽ nối: "D:\MyApps\..." + "dssv.xlsx" -> Không bao giờ trượt!
+        file_path = os.path.join(current_dir, "dssv.xlsx")
+        
+        # 3. Đọc file
+        df = pd.read_excel(file_path, dtype=str)
         valid_ids = df['MSSV'].str.strip().tolist()
         return valid_ids
+        
     except Exception as e:
-        st.error(f"⚠️ Lỗi không đọc được file dssv.xlsx: {e}")
+        # In đường dẫn ra để debug nếu vẫn lỗi
+        st.error(f"⚠️ Lỗi đọc file tại: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dssv.xlsx')}")
+        st.error(f"Chi tiết lỗi: {e}")
         return []
 
 # 2. Hàm quản lý đếm lượt dùng (Database tạm trên RAM server)
@@ -1815,3 +1823,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

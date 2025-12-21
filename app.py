@@ -1732,7 +1732,8 @@ def room_4_invest():
             st.markdown(f"Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.")
 
         st.subheader("2. Phân tích Độ nhạy (Sensitivity Analysis)")
-        st.markdown("Kiểm tra NPV khi **WACC** và **mức mất giá VND** thay đổi.")
+        st.markdown("Kiểm tra NPV khi **WACC** và **mức mất giá VND** thay đổi. Trong thực tế, Tỷ giá và WACC là hai biến số khó dự đoán nhất. Nếu Tỷ giá biến động xấu hơn dự kiến (ví dụ mất giá 5% thay vì 3%), dự án có còn lãi không?")
+
 
         wacc_range = [wacc - 2, wacc - 1, wacc, wacc + 1, wacc + 2]
         depre_range = [depre - 2, depre - 1, depre, depre + 1, depre + 2]

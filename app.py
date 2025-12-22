@@ -955,12 +955,12 @@ Theo nguyên lý **No Arbitrage**:
     if future_spot > strike:
         action_text = "Thực hiện quyền"
         price_base = strike
-        explanation_opt = "✅ Đã được bảo hiểm (Dùng Strike)"
+        explanation_opt = "✅Đã được bảo hiểm (Dùng Strike)"
         formula_opt = f"{debt_amount:,.0f} × ({strike:,.0f} + {premium:,.0f})"
     else:
         action_text = "Bỏ quyền (Lapse)"
         price_base = future_spot
-        explanation_opt = "📉 Mua giá chợ (Rẻ hơn Strike)"
+        explanation_opt = "📉Mua giá chợ (Rẻ hơn Strike)"
         formula_opt = f"{debt_amount:,.0f} × ({future_spot:,.0f} + {premium:,.0f})"
 
     effective_opt_rate = price_base + premium
@@ -983,12 +983,12 @@ Theo nguyên lý **No Arbitrage**:
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
-            width="small",  # Vừa đủ cho tên chiến lược
+            width="medium",  # Vừa đủ cho tên chiến lược
             pinned=True      # Ghim cột này
         ),
         "Trạng thái": st.column_config.TextColumn(
             "Trạng thái",
-            width="large"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
+            width="medium"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
             "Tỷ giá",        # [MẸO HAY]: Đổi tiêu đề hiển thị thành "Tỷ giá" (ngắn hơn)
@@ -998,7 +998,7 @@ Theo nguyên lý **No Arbitrage**:
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
             "Chi phí (VND)", # [MẸO HAY]: Viết gọn lại thành "Chi phí"
             format="%.0f",   
-            width="small"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
+            width="medium"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
         ),
     }
 
@@ -2089,4 +2089,5 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+
 

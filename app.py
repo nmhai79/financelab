@@ -977,60 +977,41 @@ Theo nguyên lý **No Arbitrage**:
         }
     )
 
-    # [FIX LỖI CANH TRÁI]: Ép 2 cột này về dạng số thực (float)
-    # Streamlit thấy số thực sẽ tự động canh phải
+    # --- BƯỚC 1: ÉP KIỂU SỐ (Để đảm bảo tính toán đúng) ---
     df_compare["Tỷ giá thực tế"] = df_compare["Tỷ giá thực tế"].astype(float)
     df_compare["Tổng chi phí (VND)"] = df_compare["Tổng chi phí (VND)"].astype(float)
 
-    # --- BƯỚC 2: CẤU HÌNH HIỂN THỊ (Giữ nguyên cấu hình chuẩn trước đó) ---
+    # --- BƯỚC 2: CẤU HÌNH COLUMN CONFIG (Chỉ dùng để chỉnh độ rộng và tiêu đề) ---
+    # LƯU Ý: Đã XÓA dòng format="%,.0f" ở đây để tránh xung đột
     column_config_setup = {
-        "Chiến lược": st.column_config.TextColumn(
-            "Chiến lược", 
-            width="medium",
-            pinned=True
-        ),
-        "Trạng thái": st.column_config.TextColumn(
-            "Trạng thái",
-            width="medium"
-        ),
-        "Tỷ giá thực tế": st.column_config.NumberColumn(
-            "Tỷ giá",
-            format="%,.0f", # Format có dấu phẩy
-            width="small"
-        ),
-        "Tổng chi phí (VND)": st.column_config.NumberColumn(
-            "Chi phí (VND)",
-            format="%,.0f", # Format có dấu phẩy
-            width="medium"
-        ),
+        "Chiến lược": st.column_config.TextColumn("Chiến lược", width="medium", pinned=True),
+        "Trạng thái": st.column_config.TextColumn("Trạng thái", width="medium"),
+        "Tỷ giá thực tế": st.column_config.Column("Tỷ giá", width="small"), # Dùng Column thường
+        "Tổng chi phí (VND)": st.column_config.Column("Chi phí (VND)", width="medium"),
     }
 
-    # --- BƯỚC 3: TÔ MÀU & HIỂN THỊ ---
+    # --- BƯỚC 3: XỬ LÝ STYLE (Tô màu + Format dấu phẩy + Canh phải) ---
     min_cost = df_compare["Tổng chi phí (VND)"].min()
+
+    # Hàm tô màu nền
     def highlight_best(s):
         return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
 
-    st.markdown("##### 📊 So sánh hiệu quả các chiến lược:")
-
-    st.dataframe(
-        df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
-        column_config=column_config_setup,
-        use_container_width=False, 
-        hide_index=True 
+    # TẠO STYLER OBJECT (Chuỗi xử lý liên hoàn)
+    styled_df = (
+        df_compare.style
+        .apply(highlight_best, subset=["Tổng chi phí (VND)"])             # 1. Tô màu dòng tốt nhất
+        .format("{:,.0f}", subset=["Tỷ giá thực tế", "Tổng chi phí (VND)"]) # 2. Format dấu phẩy (25000 -> 25,000)
+        # 3. QUAN TRỌNG: Ép canh lề phải bằng CSS (Vì sau khi format nó biến thành text)
+        .set_properties(subset=["Tỷ giá thực tế", "Tổng chi phí (VND)"], **{'text-align': 'right'})
     )
 
-    # --- TÔ MÀU & HIỂN THỊ ---
-    # (Logic cũ giữ nguyên)
-    min_cost = df_compare["Tổng chi phí (VND)"].min()
-    def highlight_best(s):
-        return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
-
     st.markdown("##### 📊 So sánh hiệu quả các chiến lược:")
 
     st.dataframe(
-        df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
+        styled_df, 
         column_config=column_config_setup,
-        use_container_width=False, # False để bảng gọn, không giãn loãng ra
+        use_container_width=False, 
         hide_index=True 
     )
     

@@ -354,7 +354,7 @@ Yêu cầu:
 Ràng buộc bắt buộc:
 - Trả lời hoàn toàn bằng TIẾNG VIỆT.
 - Không dùng câu tiếng Anh, không chèn thuật ngữ tiếng Anh trừ ký hiệu chuẩn (NPV, IRR, WACC, UCP 600, BID/ASK).
-- Văn phong: ngắn gọn, súc tích (khoảng 3-4 câu), đi thẳng vào rủi ro và khuyến nghị chuyên môn.
+- Văn phong: ngắn gọn, súc tích (khoảng 4-5 câu), đi thẳng vào rủi ro và khuyến nghị chuyên môn.
 """
         response = model.generate_content(prompt)
         return _force_vietnamese(getattr(response, "text", "") or "")
@@ -383,7 +383,7 @@ Tình huống hiện tại:
 - Gánh nặng nợ công quốc gia vừa tăng thêm {debt_increase:,.0f} Tỷ VND do chênh lệch tỷ giá.
 
 Yêu cầu:
-- Viết báo cáo ngắn gọn (khoảng 3 gạch đầu dòng lớn) cảnh báo 3 tác động thực tế đến đời sống người dân và doanh nghiệp.
+- Viết báo cáo ngắn gọn (khoảng 4 gạch đầu dòng lớn) cảnh báo 4 tác động thực tế đến đời sống người dân và doanh nghiệp.
 - Trả lời hoàn toàn bằng TIẾNG VIỆT (không dùng câu tiếng Anh).
 - Văn phong trang trọng, cảnh báo rủi ro, chuyên nghiệp. Không lạm dụng Markdown đậm/nhạt.
 """
@@ -442,16 +442,16 @@ with st.sidebar:
             st.error("⛔ Danh sách lớp không có MSSV này! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
     else:
         st.info("Vui lòng nhập MSSV để được kích hoạt AI tư vấn.")
-
+   
     # (Tuỳ chọn) nhập API key nhanh nếu chưa có
-    if not API_KEY:
-        with st.expander("🔑 Nhập GEMINI_API_KEY (tuỳ chọn)", expanded=False):
-            key_in = st.text_input("GEMINI_API_KEY", type="password", help="Nếu bạn chạy local và chưa set secrets/env.")
-            if key_in:
-                os.environ["GEMINI_API_KEY"] = key_in
-                API_KEY = key_in
-                genai.configure(api_key=API_KEY)
-                st.success("Đã nạp API Key cho phiên chạy hiện tại.")
+    # if not API_KEY:
+    #     with st.expander("🔑 Nhập GEMINI_API_KEY (tuỳ chọn)", expanded=False):
+    #         key_in = st.text_input("GEMINI_API_KEY", type="password", help="Nếu bạn chạy local và chưa set secrets/env.")
+    #         if key_in:
+    #             os.environ["GEMINI_API_KEY"] = key_in
+    #             API_KEY = key_in
+    #             genai.configure(api_key=API_KEY)
+    #             st.success("Đã nạp API Key cho phiên chạy hiện tại.")
     st.markdown("---")
     st.header("🏢 SƠ ĐỒ TỔ CHỨC")
     st.write("Di chuyển đến:")
@@ -471,7 +471,47 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 Sau khi tính toán, hãy xem **Giải thích** hoặc gọi **Chuyên gia AI** để được tư vấn chuyên sâu.")
     st.markdown("---")
-    st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation")
+    st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation") 
+    
+    st.markdown("---")
+    # --- PHẦN UI HƯỚNG DẪN CÀI ĐẶT ---
+    # Bạn có thể đặt đoạn này ở Sidebar hoặc cuối trang
+    with st.expander("📲 **Bấm vào đây để cài App lên điện thoại**", expanded=False):
+        st.write("Chọn iOS hoặc Android và làm theo 2 bước sau:")
+        
+        # Tạo 2 tab hướng dẫn cho iPhone và Android
+        tab_ios, tab_android = st.tabs(["🍏 iPhone (iOS)", "🤖 Android"])
+        
+        with tab_ios:
+            st.markdown("""
+            **Bước 1:** Bấm vào nút **Chia sẻ** (Share) trên thanh menu dưới cùng của Safari.  
+            *(Biểu tượng hình vuông có mũi tên đi lên)* <div style="text-align: center; margin: 10px 0;">
+                <span style="font-size: 30px;">↥</span> 
+            </div>
+
+            **Bước 2:** Kéo xuống và chọn dòng **"Thêm vào MH chính"** (Add to Home Screen).
+            
+            <div style="text-align: center; margin: 10px 0;">
+                <span style="font-size: 30px;">➕</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with tab_android:
+            st.markdown("""
+            **Bước 1:** Bấm vào nút **Menu** (3 chấm dọc) ở góc trên bên phải Chrome.
+            
+            <div style="text-align: center; margin: 10px 0;">
+                <span style="font-size: 30px;">⋮</span>
+            </div>
+
+            **Bước 2:** Chọn **"Cài đặt ứng dụng"** hoặc **"Thêm vào màn hình chính"**.
+            
+            <div style="text-align: center; margin: 10px 0;">
+                <span style="font-size: 30px;">📲</span>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.info("💡 **Mẹo:** Sau khi cài xong, App sẽ hiện icon trên màn hình chính và chạy toàn màn hình (không còn thanh địa chỉ web), giúp trải nghiệm mượt mà hơn!")
 
 
 def footer():
@@ -729,7 +769,7 @@ digraph {
             task = "Phân tích rủi ro khớp lệnh, chi phí vốn và đưa ra quyết định GO/NO-GO."
 
             # 4. Gọi AI và Xử lý lỗi
-            with st.spinner(f"AI đang phân tích... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+            with st.spinner(f"AI đang phân tích... (Lượt gọi AI thứ {current_used + 1}/{MAX_AI_QUOTA})"):
                 try:
                     advise_result = ask_gemini_advisor("Senior FX Trader", context, task)
 
@@ -750,7 +790,7 @@ digraph {
                         quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
                         
                         # 3. Hiện kết quả AI ra màn hình chính
-                        st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA TRADER</h4>{advise_result}</div>', unsafe_allow_html=True)                        
+                        st.markdown(f'<div class="ai-box"><h4>🤖 LỜI KHUYÊN CỦA NHÀ GIAO DỊCH AI</h4>{advise_result}</div>', unsafe_allow_html=True)                        
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
 
@@ -1033,7 +1073,7 @@ Theo nguyên lý **No Arbitrage**:
     """
                 task = "Nhận xét kết quả. Phân tích 'chi phí cơ hội' của Forward và 'giá trị quyền' của Option (trong 3-4 câu)."
                 
-                with st.spinner(f"AI đang phân tích chiến lược...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+                with st.spinner(f"AI đang phân tích chiến lược...(Lượt gọi AI thứ {current_used + 1}/{MAX_AI_QUOTA})"):
                     try:
                         advise = ask_gemini_advisor("CFO Expert", context, task)
                         
@@ -1050,7 +1090,7 @@ Theo nguyên lý **No Arbitrage**:
                                 quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
                             
                             # 3. Hiện kết quả
-                            st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN CHUYÊN GIA</h4>{advise}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="ai-box"><h4>🤖 GÓC NHÌN TỪ GIÁM ĐỐC TÀI CHÍNH AI</h4>{advise}</div>', unsafe_allow_html=True)
                         
                     except Exception as e:
                         st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
@@ -1527,7 +1567,7 @@ Dữ liệu:
 Lỗi phát hiện: {", ".join(curr_errs) if curr_errs else "Không có"}
 """
             task = "Giải thích ngắn gọn các lỗi (nếu có) và 1–2 cách khắc phục thực tế cho doanh nghiệp."
-            with st.spinner(f"AI đang tư vấn ... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+            with st.spinner(f"AI đang tư vấn ... (Lượt gọi AI thứ {current_used + 1}/{MAX_AI_QUOTA})"):
                 try:
                     advise = ask_gemini_advisor("Chuyên gia UCP 600", context, task)
                     if advise.startswith("⚠️"):
@@ -1546,7 +1586,7 @@ Lỗi phát hiện: {", ".join(curr_errs) if curr_errs else "Không có"}
                         quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
                         
                         # 3. Hiện kết quả AI ra màn hình chính
-                        st.markdown(f'<div class="ai-box"><h4>🤖 TƯ VẤN UCP 600</h4>{advise}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-box"><h4>🤖 LUẬT SƯ AI TƯ VẤN UCP 600</h4>{advise}</div>', unsafe_allow_html=True)
                         
                 except Exception as e:
                     st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
@@ -1791,7 +1831,7 @@ Dự án FDI:
 2) Nêu 2 rủi ro tỷ giá/khả năng chuyển lợi nhuận về nước.
 3) Khuyến nghị: Duyệt hay Từ chối (1 câu chốt).
 """
-            with st.spinner(f"Chuyên viên đang phân tích...(Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+            with st.spinner(f"Chuyên viên đang phân tích...(Lượt gọi AI thứ {current_used + 1}/{MAX_AI_QUOTA})"):
                 try:
                     advise = ask_gemini_advisor("Investment Specialist", context, task)
                     # advise = ask_gemini_advisor("CFO Advisor", context, task)
@@ -1979,7 +2019,7 @@ Làm báo cáo nhanh:
 2) Đánh giá rủi ro nợ công trong kịch bản mất giá {shock_pct}% (nêu 1-2 dấu hiệu cảnh báo).
 3) Lời khuyên hành động: thiên về Risk-On hay Risk-Off? (1 câu chốt).
 """
-        with st.spinner(f"Đang tổng hợp tín hiệu vĩ mô... (Lượt thứ {current_used + 1}/{MAX_AI_QUOTA})"):
+        with st.spinner(f"Đang tổng hợp tín hiệu vĩ mô... (Lượt gọi AI thứ {current_used + 1}/{MAX_AI_QUOTA})"):
             try:
                 advise = ask_gemini_advisor("Macro Strategist", full_context, task)
                 if advise.startswith("⚠️"):
@@ -1998,7 +2038,7 @@ Làm báo cáo nhanh:
                         quota_placeholder.info(f"Đã dùng: {new_usage}/{MAX_AI_QUOTA} lượt")
                         
                         # 3. Hiện kết quả AI ra màn hình chính
-                        st.markdown(f'<div class="ai-box"><h4>🤖 AI BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div class="ai-box"><h4>🤖 CHUYÊN GIA AI BÁO CÁO CHIẾN LƯỢC</h4>{advise}</div>', unsafe_allow_html=True)
                     
             except Exception as e:
                 st.error(f"⚠️ Lỗi khi gọi AI: {str(e)}")
@@ -2019,4 +2059,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

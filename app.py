@@ -967,9 +967,7 @@ Theo nguyên lý **No Arbitrage**:
     cost_opt = debt_amount * effective_opt_rate
 
     
-    # --- CẤU HÌNH CỘT ĐỂ HIỂN THỊ TỐT TRÊN MOBILE ---
-    # --- BƯỚC 1: TẠO DATAFRAME (Bạn cần đảm bảo đoạn này nằm TRƯỚC lệnh st.dataframe) ---
-    # Đảm bảo các biến như future_spot, cost_open... đã được tính toán ở các dòng trên
+    # --- BƯỚC 1: TẠO DATAFRAME ---
     df_compare = pd.DataFrame(
         {
             "Chiến lược": ["1. Thả nổi (No Hedge)", "2. Kỳ hạn (Forward)", "3. Quyền chọn (Option)"],
@@ -979,7 +977,12 @@ Theo nguyên lý **No Arbitrage**:
         }
     )
 
-    # --- CẤU HÌNH CỘT: CÓ DẤU PHẨY NGĂN CÁCH ---
+    # [FIX LỖI CANH TRÁI]: Ép 2 cột này về dạng số thực (float)
+    # Streamlit thấy số thực sẽ tự động canh phải
+    df_compare["Tỷ giá thực tế"] = df_compare["Tỷ giá thực tế"].astype(float)
+    df_compare["Tổng chi phí (VND)"] = df_compare["Tổng chi phí (VND)"].astype(float)
+
+    # --- BƯỚC 2: CẤU HÌNH HIỂN THỊ (Giữ nguyên cấu hình chuẩn trước đó) ---
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
@@ -992,18 +995,17 @@ Theo nguyên lý **No Arbitrage**:
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
             "Tỷ giá",
-            format="%,.0f",  # <--- Thêm dấu phẩy: 25000 -> 25,000
+            format="%,.0f", # Format có dấu phẩy
             width="small"
         ),
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
             "Chi phí (VND)",
-            format="%,.0f",  # <--- Thêm dấu phẩy: 1000000000 -> 1,000,000,000
+            format="%,.0f", # Format có dấu phẩy
             width="medium"
         ),
     }
 
-    # --- TÔ MÀU & HIỂN THỊ ---
-    # (Logic highlight giữ nguyên)
+    # --- BƯỚC 3: TÔ MÀU & HIỂN THỊ ---
     min_cost = df_compare["Tổng chi phí (VND)"].min()
     def highlight_best(s):
         return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
@@ -1013,7 +1015,7 @@ Theo nguyên lý **No Arbitrage**:
     st.dataframe(
         df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
         column_config=column_config_setup,
-        use_container_width=False,
+        use_container_width=False, 
         hide_index=True 
     )
 

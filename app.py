@@ -979,28 +979,43 @@ Theo nguyên lý **No Arbitrage**:
         }
     )
 
-    # --- CẤU HÌNH CỘT: TINH CHỈNH TỪNG MILIMET ---
+    # --- CẤU HÌNH CỘT: CÓ DẤU PHẨY NGĂN CÁCH ---
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
-            width="medium",  # Vừa đủ cho tên chiến lược
-            pinned=True      # Ghim cột này
+            width="medium",
+            pinned=True
         ),
         "Trạng thái": st.column_config.TextColumn(
             "Trạng thái",
-            width="medium"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
+            width="medium"
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
-            "Tỷ giá",        # [MẸO HAY]: Đổi tiêu đề hiển thị thành "Tỷ giá" (ngắn hơn)
-            format="%.0f",   
-            width="small"    # [SỬA LỖI]: Giờ dùng small vô tư, vừa khít số, không mất tiêu đề
+            "Tỷ giá",
+            format="%,.0f",  # <--- Thêm dấu phẩy: 25000 -> 25,000
+            width="small"
         ),
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
-            "Chi phí (VND)", # [MẸO HAY]: Viết gọn lại thành "Chi phí"
-            format="%.0f",   
-            width="medium"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
+            "Chi phí (VND)",
+            format="%,.0f",  # <--- Thêm dấu phẩy: 1000000000 -> 1,000,000,000
+            width="medium"
         ),
     }
+
+    # --- TÔ MÀU & HIỂN THỊ ---
+    # (Logic highlight giữ nguyên)
+    min_cost = df_compare["Tổng chi phí (VND)"].min()
+    def highlight_best(s):
+        return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
+
+    st.markdown("##### 📊 So sánh hiệu quả các chiến lược:")
+
+    st.dataframe(
+        df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
+        column_config=column_config_setup,
+        use_container_width=False,
+        hide_index=True 
+    )
 
     # --- TÔ MÀU & HIỂN THỊ ---
     # (Logic cũ giữ nguyên)
@@ -2089,5 +2104,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-
-

@@ -5,7 +5,6 @@ import pandas as pd
 import altair as alt
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
 
 MAX_AI_QUOTA = 5
 
@@ -474,45 +473,45 @@ with st.sidebar:
     st.markdown("---")
     st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation") 
     
-    st.markdown("---")
-    # --- PHẦN UI HƯỚNG DẪN CÀI ĐẶT ---
-    # Bạn có thể đặt đoạn này ở Sidebar hoặc cuối trang
-    with st.expander("📲 **Bấm vào đây để cài App lên điện thoại**", expanded=False):
-        st.write("Chọn iOS hoặc Android và làm theo 2 bước sau:")
+    # st.markdown("---")
+    # # --- PHẦN UI HƯỚNG DẪN CÀI ĐẶT ---
+    # # Bạn có thể đặt đoạn này ở Sidebar hoặc cuối trang
+    # with st.expander("📲 **Bấm vào đây để cài App lên điện thoại**", expanded=False):
+    #     st.write("Chọn iOS hoặc Android và làm theo 2 bước sau:")
         
-        # Tạo 2 tab hướng dẫn cho iPhone và Android
-        tab_ios, tab_android = st.tabs(["🍏 iPhone (iOS)", "🤖 Android"])
+    #     # Tạo 2 tab hướng dẫn cho iPhone và Android
+    #     tab_ios, tab_android = st.tabs(["🍏 iPhone (iOS)", "🤖 Android"])
         
-        with tab_ios:
-            st.markdown("""
-            **Bước 1:** Bấm vào nút **Chia sẻ** (Share) trên thanh menu dưới cùng của Safari.  
-            *(Biểu tượng hình vuông có mũi tên đi lên)* <div style="text-align: center; margin: 10px 0;">
-                <span style="font-size: 30px;">↥</span> 
-            </div>
+    #     with tab_ios:
+    #         st.markdown("""
+    #         **Bước 1:** Bấm vào nút **Chia sẻ** (Share) trên thanh menu dưới cùng của Safari.  
+    #         *(Biểu tượng hình vuông có mũi tên đi lên)* <div style="text-align: center; margin: 10px 0;">
+    #             <span style="font-size: 30px;">↥</span> 
+    #         </div>
 
-            **Bước 2:** Kéo xuống và chọn dòng **"Thêm vào MH chính"** (Add to Home Screen).
+    #         **Bước 2:** Kéo xuống và chọn dòng **"Thêm vào MH chính"** (Add to Home Screen).
             
-            <div style="text-align: center; margin: 10px 0;">
-                <span style="font-size: 30px;">➕</span>
-            </div>
-            """, unsafe_allow_html=True)
+    #         <div style="text-align: center; margin: 10px 0;">
+    #             <span style="font-size: 30px;">➕</span>
+    #         </div>
+    #         """, unsafe_allow_html=True)
             
-        with tab_android:
-            st.markdown("""
-            **Bước 1:** Bấm vào nút **Menu** (3 chấm dọc) ở góc trên bên phải Chrome.
+    #     with tab_android:
+    #         st.markdown("""
+    #         **Bước 1:** Bấm vào nút **Menu** (3 chấm dọc) ở góc trên bên phải Chrome.
             
-            <div style="text-align: center; margin: 10px 0;">
-                <span style="font-size: 30px;">⋮</span>
-            </div>
+    #         <div style="text-align: center; margin: 10px 0;">
+    #             <span style="font-size: 30px;">⋮</span>
+    #         </div>
 
-            **Bước 2:** Chọn **"Cài đặt ứng dụng"** hoặc **"Thêm vào màn hình chính"**.
+    #         **Bước 2:** Chọn **"Cài đặt ứng dụng"** hoặc **"Thêm vào màn hình chính"**.
             
-            <div style="text-align: center; margin: 10px 0;">
-                <span style="font-size: 30px;">📲</span>
-            </div>
-            """, unsafe_allow_html=True)
+    #         <div style="text-align: center; margin: 10px 0;">
+    #             <span style="font-size: 30px;">📲</span>
+    #         </div>
+    #         """, unsafe_allow_html=True)
 
-        st.info("💡 **Mẹo:** Sau khi cài xong, App sẽ hiện icon trên màn hình chính và chạy toàn màn hình (không còn thanh địa chỉ web), giúp trải nghiệm mượt mà hơn!")
+    #     st.info("💡 **Mẹo:** Sau khi cài xong, App sẽ hiện icon trên màn hình chính và chạy toàn màn hình (không còn thanh địa chỉ web), giúp trải nghiệm mượt mà hơn!")
 
 
 def footer():
@@ -2088,4 +2087,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

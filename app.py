@@ -5,6 +5,35 @@ import pandas as pd
 import altair as alt
 import streamlit as st
 import google.generativeai as genai
+from PIL import Image
+
+# ==============================================================================
+# CẤU HÌNH APP (BẮT BUỘC ĐẶT Ở DÒNG ĐẦU TIÊN CỦA HÀM HOẶC FILE)
+# ==============================================================================
+try:
+    # Load icon đã tạo ở Bước 1
+    icon_img = Image.open("app_icon.png")
+except FileNotFoundError:
+    # Fallback nếu chưa có file ảnh thì dùng emoji tạm
+    icon_img = "💰"
+
+st.set_page_config(
+    page_title="Financial Lab",      # Tên hiển thị trên Tab trình duyệt & Tên App khi cài trên ĐT
+    page_icon=icon_img,              # Icon hiển thị trên Tab & Icon App trên màn hình ĐT
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- CSS TÙY CHỈNH ---
+# (Phần này để ẩn bớt các element thừa của Streamlit giúp App giống Native App hơn trên điện thoại)
+st.markdown("""
+    <style>
+    /* Ẩn Hamburger Menu và Footer mặc định để trông chuyên nghiệp hơn */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;} 
+    </style>
+""", unsafe_allow_html=True)
 
 MAX_AI_QUOTA = 5
 

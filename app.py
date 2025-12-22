@@ -7,61 +7,6 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 
-
-import base64
-
-# ==============================================================================
-# 1. CẤU HÌNH APP (PHẢI Ở DÒNG ĐẦU TIÊN)
-# ==============================================================================
-try:
-    # Load icon từ file
-    icon_img = Image.open("app_icon.png")
-except FileNotFoundError:
-    icon_img = "💰"
-
-st.set_page_config(
-    page_title="Financial Lab",      
-    page_icon=icon_img,              
-    layout="wide",
-    initial_sidebar_state="expanded" 
-)
-
-# ==============================================================================
-# 2. XỬ LÝ CSS & META TAGS (FIX LỖI SIDEBAR & ICON MOBILE)
-# ==============================================================================
-
-# Hàm phụ trợ để chuyển file ảnh sang base64 (giúp trình duyệt mobile đọc được ảnh trực tiếp từ code)
-def get_img_as_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
-
-try:
-    img_base64 = get_img_as_base64("app_icon.png")
-    # Tạo chuỗi HTML chứa icon base64
-    icon_html = f'data:image/png;base64,{img_base64}'
-except:
-    icon_html = ""
-
-st.markdown(f"""
-    <style>
-    /* CHỈ Ẩn menu 3 chấm (Hamburger menu bên phải), KHÔNG ẩn Header (nơi chứa nút Sidebar) */
-    #MainMenu {{visibility: hidden;}}
-    
-    /* Ẩn Footer "Made with Streamlit" */
-    footer {{visibility: hidden;}}
-    
-    /* TUYỆT ĐỐI KHÔNG DÙNG: header {{visibility: hidden;}} -> Nếu dùng dòng này sẽ mất nút mở Sidebar */
-    </style>
-
-    <head>
-        <link rel="apple-touch-icon" sizes="180x180" href="{icon_html}">
-        <link rel="icon" type="image/png" sizes="32x32" href="{icon_html}">
-        <meta name="apple-mobile-web-app-title" content="Financial Lab">
-        <meta name="application-name" content="Financial Lab">
-    </head>
-""", unsafe_allow_html=True)
-
 MAX_AI_QUOTA = 5
 
 # 1. Hàm load danh sách sinh viên từ Excel (Chạy 1 lần duy nhất để tiết kiệm RAM)
@@ -2143,3 +2088,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

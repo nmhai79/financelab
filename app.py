@@ -739,7 +739,7 @@ digraph {
 
         # AI
         st.markdown("---")
-        if st.button("AI Trader: Phân tích rủi ro", type="primary", icon="🤖", key="btn_ai_risk"):
+        if st.button("AI Advisor – FX Arbitrage", type="primary", icon="🤖", key="btn_ai_risk"):
             # BƯỚC 1: KIỂM TRA ĐĂNG NHẬP (Lấy từ Session State)
             # Lấy ID từ session ra, nếu không có thì trả về None
             user_id = st.session_state.get('CURRENT_USER') 
@@ -1055,7 +1055,7 @@ Theo nguyên lý **No Arbitrage**:
 
     st.markdown("---")
     # --- PHẦN NÚT BẤM AI ---
-    if st.button("AI CFO: Phân tích chuyên sâu", type="primary", icon="🤖", key="btn_ai_cfo"):
+    if st.button("AI Advisor – FX Hedging", type="primary", icon="🤖", key="btn_ai_cfo"):
         
         # BƯỚC 1: LẤY USER ID
         user_id = st.session_state.get('CURRENT_USER') 
@@ -1547,7 +1547,7 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
                 st.warning("👉 Hậu quả: Ngân hàng có quyền **từ chối thanh toán** và thu phí discrepancy (thường 50–100 USD/lỗi).")
 
         st.markdown("---")
-        if st.button("AI Lawyer: Tư vấn UCP 600", type="primary", icon="🤖", key="btn_ai_ucp"):
+        if st.button("AI Advisor – Trade Checking", type="primary", icon="🤖", key="btn_ai_ucp"):
             curr_errs = []
             if ship_date > lc_exp_date:
                 curr_errs.append("Late Shipment")
@@ -1836,7 +1836,7 @@ def room_4_invest():
         st.dataframe(df_sens.style.applymap(color_negative_red).format("{:,.0f}"))
 
         st.markdown("---")
-        if st.button("AI Specialist: Đánh giá Dự án", type="primary", icon="🤖", key="btn_ai_invest"):
+        if st.button("AI Advisor – FDI Analysis", type="primary", icon="🤖", key="btn_ai_invest"):
             user_id = st.session_state.get('CURRENT_USER') 
 
             if not user_id:
@@ -2025,7 +2025,7 @@ Bạn có thể lời đều từ chênh lãi suất, nhưng một cú đảo ch
             )
 
     st.markdown("---")
-    if st.button("AI Expert: Phân tích Rủi ro & Xu hướng", type="primary", icon="🤖", key="btn_ai_macro"):
+    if st.button("AI Advisor – Macro Strategist", type="primary", icon="🤖", key="btn_ai_macro"):
         user_id = st.session_state.get('CURRENT_USER') 
 
         if not user_id:
@@ -2092,4 +2092,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

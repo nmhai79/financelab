@@ -979,31 +979,31 @@ Theo nguyên lý **No Arbitrage**:
         }
     )
 
-    # --- CẤU HÌNH CỘT: ÔM SÁT NỘI DUNG (COMPACT) ---
+    # --- CẤU HÌNH CỘT: TINH CHỈNH TỪNG MILIMET ---
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
-            width=None,      # Để None: Nó sẽ tự co giãn theo độ dài chữ
-            pinned=True      # Ghim cột này để khi cuộn ngang nó vẫn đứng yên
+            width="medium",  # Vừa đủ cho tên chiến lược
+            pinned=True      # Ghim cột này
         ),
         "Trạng thái": st.column_config.TextColumn(
             "Trạng thái",
-            width="small"    # Ép nhỏ nhất có thể (vì nội dung cột này thường ngắn)
+            width="medium"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
-            "Tỷ giá thực tế",
+            "Tỷ giá",        # [MẸO HAY]: Đổi tiêu đề hiển thị thành "Tỷ giá" (ngắn hơn)
             format="%.0f",   
-            width="small"    # Ép nhỏ lại cho gọn (số 25,000 khá ngắn)
+            width="small"    # [SỬA LỖI]: Giờ dùng small vô tư, vừa khít số, không mất tiêu đề
         ),
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
-            "Tổng chi phí (VND)",
+            "Chi phí (VND)", # [MẸO HAY]: Viết gọn lại thành "Chi phí"
             format="%.0f",   
-            width="medium"   # Đổi từ 'large' xuống 'medium' là đủ hiển thị số tiền tỷ mà không quá dư thừa
+            width="medium"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
         ),
     }
 
     # --- TÔ MÀU & HIỂN THỊ ---
-    # (Giữ nguyên logic tô màu cũ)
+    # (Logic cũ giữ nguyên)
     min_cost = df_compare["Tổng chi phí (VND)"].min()
     def highlight_best(s):
         return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
@@ -1013,25 +1013,11 @@ Theo nguyên lý **No Arbitrage**:
     st.dataframe(
         df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
         column_config=column_config_setup,
-        use_container_width=False,  # QUAN TRỌNG: Đổi thành False để bảng KHÔNG bị giãn cưỡng bức ra full màn hình
+        use_container_width=False, # False để bảng gọn, không giãn loãng ra
         hide_index=True 
     )
-
-    st.caption("👇 Biểu đồ so sánh: cột **XANH** là phương án có chi phí thấp nhất")
-    min_val = df_compare["Tổng chi phí (VND)"].min()
-    df_plot = df_compare.copy()
-    df_plot["Color"] = df_plot["Tổng chi phí (VND)"].apply(lambda x: "#22c55e" if x == min_val else "#94a3b8")
-
-    base = alt.Chart(df_plot).encode(
-        x=alt.X("Chiến lược", axis=alt.Axis(labelAngle=0, title=None)),
-        y=alt.Y("Tổng chi phí (VND)", axis=alt.Axis(format=",.0f")),
-        tooltip=["Chiến lược", alt.Tooltip("Tổng chi phí (VND)", format=",.0f")],
-    )
-    bars = base.mark_bar(cornerRadius=8).encode(color=alt.Color("Color", scale=None))
-    text = base.mark_text(align="center", baseline="bottom", dy=-6, color="black").encode(
-        text=alt.Text("Tổng chi phí (VND)", format=",.0f")
-    )
-    st.altair_chart(bars + text, use_container_width=True)
+    
+    # --- BƯỚC 3: KẾT LUẬN & GIẢI THÍCH ---
 
     best_idx = df_compare["Tổng chi phí (VND)"].idxmin()
     best_strat = df_compare.loc[best_idx, "Chiến lược"]

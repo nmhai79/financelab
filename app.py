@@ -979,44 +979,41 @@ Theo nguyên lý **No Arbitrage**:
         }
     )
 
-    # --- BƯỚC 2: CẤU HÌNH HIỂN THỊ (Để không bị vỡ trên Mobile) ---
+    # --- CẤU HÌNH CỘT: ÔM SÁT NỘI DUNG (COMPACT) ---
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
-            width="medium",  
-            pinned=True      # Cố định cột này bên trái
+            width=None,      # Để None: Nó sẽ tự co giãn theo độ dài chữ
+            pinned=True      # Ghim cột này để khi cuộn ngang nó vẫn đứng yên
         ),
         "Trạng thái": st.column_config.TextColumn(
             "Trạng thái",
-            width="small"
+            width="small"    # Ép nhỏ nhất có thể (vì nội dung cột này thường ngắn)
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
             "Tỷ giá thực tế",
-            format="%.0f",   # Làm tròn số
-            width="medium"   
+            format="%.0f",   
+            width="small"    # Ép nhỏ lại cho gọn (số 25,000 khá ngắn)
         ),
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
             "Tổng chi phí (VND)",
             format="%.0f",   
-            width="large"    # QUAN TRỌNG: Để large để hiện thanh cuộn nếu số quá dài
+            width="medium"   # Đổi từ 'large' xuống 'medium' là đủ hiển thị số tiền tỷ mà không quá dư thừa
         ),
     }
 
-    # --- BƯỚC 3: TÔ MÀU & HIỂN THỊ ---
-    # Tìm giá trị chi phí thấp nhất để highlight
+    # --- TÔ MÀU & HIỂN THỊ ---
+    # (Giữ nguyên logic tô màu cũ)
     min_cost = df_compare["Tổng chi phí (VND)"].min()
-
     def highlight_best(s):
-        # Tô màu xanh nhạt cho ô có giá trị bằng min_cost
         return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
 
     st.markdown("##### 📊 So sánh hiệu quả các chiến lược:")
 
-    # Vẽ bảng
     st.dataframe(
         df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
         column_config=column_config_setup,
-        use_container_width=True, 
+        use_container_width=False,  # QUAN TRỌNG: Đổi thành False để bảng KHÔNG bị giãn cưỡng bức ra full màn hình
         hide_index=True 
     )
 

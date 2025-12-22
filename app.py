@@ -1771,7 +1771,7 @@ def room_4_invest():
                 - $CF_{{t,USD}}$ = Dòng tiền hoạt động ({cf_yearly:,.0f} USD).
                 - $TV_n$ = Giá trị thanh lý tài sản chỉ ở năm cuối ({salvage_val:,.0f} USD)
                 - $S_t$ = Tỷ giá dự báo năm t, tính bằng $S_0(1+{depre}\\%)^t$
-                - WACC = Chi phí vốn ({wacc}\\%)
+                - WACC = Chi phí vốn bình quân ({wacc}\\%)
                 """
             )
 
@@ -2092,3 +2092,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

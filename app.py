@@ -934,6 +934,7 @@ Theo nguyên lý **No Arbitrage**:
             st.warning(
                 f"""
 🔥 **Cảnh báo:** Spot dự báo ({future_spot:,.0f}) cao hơn Forward ({f_rate_input:,.0f}).
+
 👉 **Nên phòng vệ:** Forward/Option đều giúp né mức giá cao.
 """
             )
@@ -941,6 +942,7 @@ Theo nguyên lý **No Arbitrage**:
             st.success(
                 f"""
 ❄️ **Thị trường hạ nhiệt:** Spot dự báo ({future_spot:,.0f}) thấp hơn Forward ({f_rate_input:,.0f}).
+
 👉 **Cân nhắc:** Thả nổi hoặc Option (bỏ quyền) có thể lợi hơn Forward.
 """
             )
@@ -1027,6 +1029,7 @@ Theo nguyên lý **No Arbitrage**:
 **Vì sao chọn Forward?**
 - Forward ({f_rate_input:,.0f}) rẻ hơn Spot dự báo ({future_spot:,.0f}).
 - Rẻ hơn Option (vì Option phải cộng premium thành {effective_opt_rate:,.0f}).
+
 👉 Hợp doanh nghiệp thích “chốt chi phí” chắc chắn.
 """
         )
@@ -1036,6 +1039,7 @@ Theo nguyên lý **No Arbitrage**:
 **Vì sao chọn Option?**
 - Tổng chi phí Option đang thấp nhất (đã gồm premium).
 - Khi thị trường bùng nổ, Option “chặn trần” bằng Strike ({strike:,.0f}) thay vì mua theo Spot cao.
+
 👉 Option mạnh khi biến động lớn và bạn muốn giữ “quyền chọn cơ hội”.
 """
         )
@@ -1044,6 +1048,7 @@ Theo nguyên lý **No Arbitrage**:
             f"""
 **Vì sao chọn Thả nổi?**
 - Bạn kỳ vọng tỷ giá giảm ({future_spot:,.0f}) ⇒ chốt Forward/Option lúc này có thể lãng phí.
+
 👉 *Rủi ro cao*: dự báo sai sẽ đội chi phí rất mạnh.
 """
         )
@@ -1754,7 +1759,7 @@ def room_4_invest():
             )
 
         with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=False):
-            st.markdown("#### 1) NPV điều chỉnh tỷ giá")
+            st.markdown("#### 1) NPV điều chỉnh theo tỷ giá")
             st.markdown("Dòng tiền USD được **quy đổi sang VND theo tỷ giá kỳ vọng** từng năm trước khi chiết khấu.")
             st.latex(
                 r"NPV = -I_0 \times S_0 + \sum_{t=1}^{n} \frac{(CF_{t,USD} + TV_n)\times S_t}{(1+\text{WACC})^t}"
@@ -1794,7 +1799,7 @@ def room_4_invest():
 
             st.divider()
 
-            st.markdown("#### 3) IRR")
+            st.markdown("#### 3) Suất sinh lời nội bộ (IRR)")
             st.markdown("IRR là mức lãi suất làm cho **NPV = 0**.")
             st.latex(r"\sum_{t=0}^{n}\frac{CF_{t,VND}}{(1+IRR)^t}=0")
             st.markdown(f"Trong bài này: IRR = **{irr_value:.2f}%** so với WACC = **{wacc}%**.")

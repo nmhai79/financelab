@@ -24,17 +24,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS TÙY CHỈNH ---
-# (Phần này để ẩn bớt các element thừa của Streamlit giúp App giống Native App hơn trên điện thoại)
-st.markdown("""
-    <style>
-    /* Ẩn Hamburger Menu và Footer mặc định để trông chuyên nghiệp hơn */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;} 
-    </style>
-""", unsafe_allow_html=True)
-
 MAX_AI_QUOTA = 5
 
 # 1. Hàm load danh sách sinh viên từ Excel (Chạy 1 lần duy nhất để tiết kiệm RAM)
@@ -2116,3 +2105,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

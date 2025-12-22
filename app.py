@@ -966,11 +966,11 @@ Theo nguyên lý **No Arbitrage**:
     effective_opt_rate = price_base + premium
     cost_opt = debt_amount * effective_opt_rate
 
+    
     df_compare = pd.DataFrame(
         {
             "Chiến lược": ["1. Thả nổi (No Hedge)", "2. Kỳ hạn (Forward)", "3. Quyền chọn (Option)"],
-            "Trạng thái": ["Chấp nhận rủi ro", "Khóa cứng tỷ giá", explanation_opt],
-            "Cách tính (Debt × Rate)": [formula_open, formula_fwd, formula_opt],
+            "Trạng thái": ["Chấp nhận rủi ro", "Khóa cứng tỷ giá", explanation_opt],            
             "Tỷ giá thực tế": [future_spot, f_rate_input, effective_opt_rate],
             "Tổng chi phí (VND)": [cost_open, cost_fwd, cost_opt],
         }

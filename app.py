@@ -967,22 +967,57 @@ Theo nguyên lý **No Arbitrage**:
     cost_opt = debt_amount * effective_opt_rate
 
     
+    # --- CẤU HÌNH CỘT ĐỂ HIỂN THỊ TỐT TRÊN MOBILE ---
+    # --- BƯỚC 1: TẠO DATAFRAME (Bạn cần đảm bảo đoạn này nằm TRƯỚC lệnh st.dataframe) ---
+    # Đảm bảo các biến như future_spot, cost_open... đã được tính toán ở các dòng trên
     df_compare = pd.DataFrame(
         {
             "Chiến lược": ["1. Thả nổi (No Hedge)", "2. Kỳ hạn (Forward)", "3. Quyền chọn (Option)"],
-            "Trạng thái": ["Chấp nhận rủi ro", "Khóa cứng tỷ giá", explanation_opt],            
+            "Trạng thái": ["Chấp nhận rủi ro", "Khóa cứng tỷ giá", explanation_opt],
             "Tỷ giá thực tế": [future_spot, f_rate_input, effective_opt_rate],
             "Tổng chi phí (VND)": [cost_open, cost_fwd, cost_opt],
         }
     )
 
-    st.table(
-        df_compare.style.format(
-            {
-                "Tỷ giá thực tế": "{:,.0f}",
-                "Tổng chi phí (VND)": "{:,.0f}",
-            }
-        )
+    # --- BƯỚC 2: CẤU HÌNH HIỂN THỊ (Để không bị vỡ trên Mobile) ---
+    column_config_setup = {
+        "Chiến lược": st.column_config.TextColumn(
+            "Chiến lược", 
+            width="medium",  
+            pinned=True      # Cố định cột này bên trái
+        ),
+        "Trạng thái": st.column_config.TextColumn(
+            "Trạng thái",
+            width="small"
+        ),
+        "Tỷ giá thực tế": st.column_config.NumberColumn(
+            "Tỷ giá thực tế",
+            format="%.0f",   # Làm tròn số
+            width="medium"   
+        ),
+        "Tổng chi phí (VND)": st.column_config.NumberColumn(
+            "Tổng chi phí (VND)",
+            format="%.0f",   
+            width="large"    # QUAN TRỌNG: Để large để hiện thanh cuộn nếu số quá dài
+        ),
+    }
+
+    # --- BƯỚC 3: TÔ MÀU & HIỂN THỊ ---
+    # Tìm giá trị chi phí thấp nhất để highlight
+    min_cost = df_compare["Tổng chi phí (VND)"].min()
+
+    def highlight_best(s):
+        # Tô màu xanh nhạt cho ô có giá trị bằng min_cost
+        return ['background-color: #d1e7dd; color: #0f5132; font-weight: bold' if v == min_cost else '' for v in s]
+
+    st.markdown("##### 📊 So sánh hiệu quả các chiến lược:")
+
+    # Vẽ bảng
+    st.dataframe(
+        df_compare.style.apply(highlight_best, subset=["Tổng chi phí (VND)"]), 
+        column_config=column_config_setup,
+        use_container_width=True, 
+        hide_index=True 
     )
 
     st.caption("👇 Biểu đồ so sánh: cột **XANH** là phương án có chi phí thấp nhất")
@@ -1723,7 +1758,19 @@ def room_4_invest():
         st.bar_chart(df_chart.set_index("Năm")[["PV (Hiện giá VND)"]], color="#4B4BFF")
 
         with st.expander("🔎 Xem bảng dòng tiền chi tiết (Cashflow Table)"):
-            st.dataframe(pd.DataFrame(data_cf).style.format("{:,.0f}"))
+            # 1. Tạo DataFrame từ list data_cf
+            df_display = pd.DataFrame(data_cf)
+            
+            # 2. QUAN TRỌNG: Thiết lập cột "Năm" làm Index (Trục cố định)
+            # Việc này giúp loại bỏ cột số thứ tự 0,1,2 thừa thãi
+            # Và giúp cột "Năm" luôn đứng yên bên trái khi bạn kéo thanh cuộn ngang
+            df_display.set_index("Năm", inplace=True)
+            
+            # 3. Hiển thị bảng
+            st.dataframe(
+                df_display.style.format("{:,.0f}"), # Format số phân cách hàng nghìn
+                use_container_width=True,           # Tràn viền màn hình                
+            )
 
         with st.expander("🎓 GÓC HỌC TẬP: GIẢI MÃ CÔNG THỨC & SỐ LIỆU", expanded=False):
             st.markdown("#### 1) NPV điều chỉnh tỷ giá")

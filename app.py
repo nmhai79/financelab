@@ -983,12 +983,12 @@ Theo nguyên lý **No Arbitrage**:
     column_config_setup = {
         "Chiến lược": st.column_config.TextColumn(
             "Chiến lược", 
-            width="medium",  # Vừa đủ cho tên chiến lược
+            width="small",  # Vừa đủ cho tên chiến lược
             pinned=True      # Ghim cột này
         ),
         "Trạng thái": st.column_config.TextColumn(
             "Trạng thái",
-            width="medium"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
+            width="large"   # [SỬA LỖI]: Tăng lên medium để dòng "Chấp nhận rủi ro" hiện đủ, không bị cắt
         ),
         "Tỷ giá thực tế": st.column_config.NumberColumn(
             "Tỷ giá",        # [MẸO HAY]: Đổi tiêu đề hiển thị thành "Tỷ giá" (ngắn hơn)
@@ -998,7 +998,7 @@ Theo nguyên lý **No Arbitrage**:
         "Tổng chi phí (VND)": st.column_config.NumberColumn(
             "Chi phí (VND)", # [MẸO HAY]: Viết gọn lại thành "Chi phí"
             format="%.0f",   
-            width="medium"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
+            width="small"   # Để medium để số tiền hàng tỷ hiển thị rõ ràng, không bị quá rộng như large
         ),
     }
 
@@ -2089,3 +2089,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

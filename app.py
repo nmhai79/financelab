@@ -5,78 +5,114 @@ import pandas as pd
 import altair as alt
 import streamlit as st
 import google.generativeai as genai
+from supabase import create_client, Client
 
 MAX_AI_QUOTA = 5
 
-# 1. Hàm load danh sách sinh viên từ Excel (Chạy 1 lần duy nhất để tiết kiệm RAM)
+# --- CẤU HÌNH SUPABASE (Đặt ngay đầu file hoặc sau các dòng import) ---
+# Dùng @st.cache_resource để không phải kết nối lại mỗi lần F5
+@st.cache_resource
+def init_supabase():
+    try:
+        url = st.secrets["connections"]["supabase"]["SUPABASE_URL"]
+        key = st.secrets["connections"]["supabase"]["SUPABASE_KEY"]
+        return create_client(url, key)
+    except Exception as e:
+        st.error(f"⚠️ Lỗi kết nối Supabase: {e}")
+        return None
+
+supabase_client = init_supabase()
+
+# ------------------------------------------------------------------
+# GIỮ NGUYÊN HÀM ĐỌC EXCEL CỦA BẠN (Code cũ)
+# ------------------------------------------------------------------
 @st.cache_resource
 def load_valid_students():
     try:
-        # 1. Lấy đường dẫn của file code hiện tại (app.py)
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        
-        # 2. Tạo đường dẫn tuyệt đối đến file Excel
-        # Nó sẽ nối: "D:\MyApps\..." + "dssv.xlsx" -> Không bao giờ trượt!
         file_path = os.path.join(current_dir, "dssv.xlsx")
-        
-        # 3. Đọc file
         df = pd.read_excel(file_path, dtype=str)
-        valid_ids = df['MSSV'].str.strip().tolist()
+        # Chuẩn hóa: viết hoa, xóa khoảng trắng thừa
+        valid_ids = df['MSSV'].astype(str).str.strip().str.upper().tolist() 
         return valid_ids
-        
     except Exception as e:
-        # In đường dẫn ra để debug nếu vẫn lỗi
-        st.error(f"⚠️ Lỗi đọc file tại: {os.path.join(os.path.dirname(os.path.abspath(__file__)), 'dssv.xlsx')}")
-        st.error(f"Chi tiết lỗi: {e}")
+        st.error(f"⚠️ Lỗi đọc file Excel: {e}")
         return []
 
-# 2. Hàm quản lý đếm lượt dùng (Database tạm trên RAM server)
-@st.cache_resource
-def get_usage_tracker():
-    # Cấu trúc: {'MSSV_A': 0, 'MSSV_B': 2}
-    return {}
+# ------------------------------------------------------------------
+# PHẦN CODE MỚI: QUẢN LÝ QUOTA BẰNG SUPABASE
+# (Thay thế hoàn toàn phần RAM tracker cũ)
+# ------------------------------------------------------------------
 
-def verify_and_check_quota(student_id, max_limit=3):
+def get_usage_from_supabase(student_id):
+    """Hàm phụ: Lấy số lượt dùng hiện tại từ Database"""
+    if not supabase_client: return 999 # Chặn nếu lỗi DB
+    
+    try:
+        # Query bảng 'user_quota', tìm dòng có mssv tương ứng
+        response = supabase_client.table("user_quota").select("usage").eq("mssv", student_id).execute()
+        
+        # Nếu tìm thấy dữ liệu -> Trả về số usage
+        if response.data:
+            return response.data[0]['usage']
+        else:
+            # Nếu chưa có trong DB -> Coi như là 0
+            return 0
+    except Exception as e:
+        print(f"Lỗi đọc DB: {e}") # Log ra terminal server để debug
+        return 0
+
+def update_usage_to_supabase(student_id, current_usage):
+    """Hàm phụ: Cập nhật (Ghi đè) số lượt dùng mới"""
+    if not supabase_client: return
+    
+    try:
+        # Dữ liệu cần lưu
+        # Upsert: Nếu chưa có thì Thêm mới, Có rồi thì Cập nhật
+        data = {"mssv": student_id, "usage": current_usage + 1}
+        supabase_client.table("user_quota").upsert(data, on_conflict="mssv").execute()
+    except Exception as e:
+        st.error(f"Lỗi ghi Database: {e}")
+
+# --- HÀM LOGIC CHÍNH (Đã sửa đổi để gọi Supabase) ---
+
+def verify_and_check_quota(student_id, max_limit=MAX_AI_QUOTA):
     """
-    Hàm này trả về 3 trạng thái:
-    - "INVALID": MSSV không có trong file Excel
-    - "LIMIT_REACHED": Có trong file nhưng hết lượt
-    - "OK": Hợp lệ và còn lượt (sẽ tự động trừ 1 lượt)
+    Kiểm tra 2 lớp:
+    1. Có trong file Excel không? (Hợp lệ)
+    2. Check Supabase xem còn lượt không? (Quota)
     """
-    # Load danh sách hợp lệ
+    # Load danh sách cho phép từ Excel
     valid_list = load_valid_students()
     
-    # Chuẩn hóa input (chữ thường/hoa, xóa khoảng trắng)
-    clean_id = str(student_id).strip()
+    # Chuẩn hóa input đầu vào (Viết hoa để khớp với Excel/DB)
+    clean_id = str(student_id).strip().upper()
     
-    # A. Kiểm tra có trong danh sách không
+    # LỚP 1: KIỂM TRA DANH TÍNH
     if clean_id not in valid_list:
         return "INVALID", 0
     
-    # B. Kiểm tra hạn mức
-    tracker = get_usage_tracker()
-    
-    # Nếu chưa dùng lần nào thì tạo mới = 0
-    if clean_id not in tracker:
-        tracker[clean_id] = 0
-        
-    current_usage = tracker[clean_id]
+    # LỚP 2: KIỂM TRA QUOTA TỪ SUPABASE (Thay vì RAM)
+    current_usage = get_usage_from_supabase(clean_id)
     
     if current_usage >= max_limit:
         return "LIMIT_REACHED", current_usage
     
-    # C. Nếu OK thì tăng đếm và cho phép
-    # Lưu ý: Chỉ gọi hàm này khi CHẮC CHẮN thực hiện lệnh AI
+    # Trả về OK và số lượt hiện tại
     return "OK", current_usage
 
 def consume_quota(student_id):
-    """Gọi hàm này sau khi AI chạy thành công để trừ lượt"""
-    clean_id = str(student_id).strip()
-    tracker = get_usage_tracker()
-    if clean_id in tracker:
-        tracker[clean_id] += 1
-    else:
-        tracker[clean_id] = 1
+    """
+    Gọi hàm này sau khi AI chạy thành công để trừ lượt
+    (Lưu thẳng vào Supabase)
+    """
+    clean_id = str(student_id).strip().upper()
+    
+    # Lấy số hiện tại để đảm bảo tính đúng
+    current_usage = get_usage_from_supabase(clean_id)
+    
+    # Ghi số mới (cộng thêm 1) vào DB
+    update_usage_to_supabase(clean_id, current_usage)
 
 # ==============================================================================
 # 0) PAGE CONFIG

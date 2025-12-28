@@ -7,7 +7,7 @@ import streamlit as st
 import google.generativeai as genai
 from supabase import create_client, Client
 
-MAX_AI_QUOTA = 5
+MAX_AI_QUOTA = 10
 
 # --- CẤU HÌNH SUPABASE (Đặt ngay đầu file hoặc sau các dòng import) ---
 # Dùng @st.cache_resource để không phải kết nối lại mỗi lần F5
@@ -2122,3 +2122,4 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+

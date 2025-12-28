@@ -1,8 +1,10 @@
 streamlit
 pandas
 numpy
+supabase
 google-generativeai
 numpy-financial
 matplotlib
 openpyxl
+
 

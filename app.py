@@ -464,8 +464,7 @@ with st.sidebar:
             # [QUAN TRỌNG] Tạo một cái hộp rỗng và gán vào biến 'quota_placeholder'
             quota_placeholder = st.empty()
             # B. Hiển thị số lượt đã dùng ngay tại đây cho SV thấy
-            tracker = get_usage_tracker()
-            current_used = tracker.get(input_mssv, 0)
+            current_used = get_usage_from_supabase(input_mssv)
             
             # Đổi màu hiển thị cho sinh động
             if current_used < MAX_AI_QUOTA:
@@ -786,8 +785,7 @@ digraph {
                 st.stop() # Dừng lại ngay, không chạy tiếp
 
             # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-            tracker = get_usage_tracker()
-            current_used = tracker.get(user_id, 0)
+            current_used = get_usage_from_supabase(user_id)
             
             if current_used >= MAX_AI_QUOTA:
                 st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
@@ -1106,8 +1104,7 @@ Theo nguyên lý **No Arbitrage**:
         # TRƯỜNG HỢP 2: ĐÃ ĐĂNG NHẬP (Xử lý tiếp Quota và AI trong khối này)
         else:
             # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-            tracker = get_usage_tracker()
-            current_used = tracker.get(user_id, 0)
+            current_used = get_usage_from_supabase(user_id)
             
             if current_used >= MAX_AI_QUOTA:
                 # Hết lượt -> Báo cảnh báo
@@ -1604,8 +1601,7 @@ Chênh lệch chi phí chính là **“phí mua sự an toàn”** cho lô hàng
                 st.stop() # Dừng lại ngay, không chạy tiếp
 
                 # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-            tracker = get_usage_tracker()
-            current_used = tracker.get(user_id, 0)
+            current_used = get_usage_from_supabase(user_id)
                 
             if current_used >= MAX_AI_QUOTA:
                 st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
@@ -1881,8 +1877,7 @@ def room_4_invest():
                 st.stop() # Dừng lại ngay, không chạy tiếp
 
                 # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-            tracker = get_usage_tracker()
-            current_used = tracker.get(user_id, 0)
+            current_used = get_usage_from_supabase(user_id)
                 
             if current_used >= MAX_AI_QUOTA:
                 st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")
@@ -2070,8 +2065,7 @@ Bạn có thể lời đều từ chênh lãi suất, nhưng một cú đảo ch
             st.stop() # Dừng lại ngay, không chạy tiếp
 
                 # BƯỚC 2: KIỂM TRA HẠN MỨC (QUOTA)
-        tracker = get_usage_tracker()
-        current_used = tracker.get(user_id, 0)
+        current_used = get_usage_from_supabase(user_id)
                 
         if current_used >= MAX_AI_QUOTA:
             st.warning(f"⚠️ Sinh viên {user_id} đã hết lượt dùng AI ({MAX_AI_QUOTA}/{MAX_AI_QUOTA}).")

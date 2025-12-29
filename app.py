@@ -7,7 +7,23 @@ import streamlit as st
 import google.generativeai as genai
 from supabase import create_client, Client
 
-MAX_AI_QUOTA = 10
+MAX_AI_QUOTA = 5
+
+# Đặt đoạn này ở ngay đầu file app.py (sau các lệnh import)
+st.set_page_config(
+    page_title="Finance Lab",
+    page_icon="chart_with_upwards_trend",
+    layout="wide",
+    menu_items={        
+        'About': """
+        ### Finance Lab - International Finance Simulation
+        **© 2026 - Nguyễn Minh Hải**
+        
+        Phiên bản Beta 2.0.
+        Ứng dụng hỗ trợ giảng dạy môn Tài chính Quốc tế.
+        """
+    }
+)
 
 # --- CẤU HÌNH SUPABASE (Đặt ngay đầu file hoặc sau các dòng import) ---
 # Dùng @st.cache_resource để không phải kết nối lại mỗi lần F5
@@ -506,7 +522,12 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 Sau khi tính toán, hãy xem **Giải thích** hoặc gọi **Chuyên gia AI** để được tư vấn chuyên sâu.")
     st.markdown("---")
-    st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation") 
+    #st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation") 
+    # Tạo nút bấm trải dài hết chiều rộng sidebar
+    # Người dùng bấm vào dòng chữ bản quyền -> Hiện logo
+    with st.popover("© 2026 - Nguyễn Minh Hải  ℹ️", use_container_width=True):        
+        st.write("Mô phỏng Tài chính Quốc tế")
+        st.image("logo.png") # Nhớ thay tên file ảnh của bạn
     
     # st.markdown("---")
     # # --- PHẦN UI HƯỚNG DẪN CÀI ĐẶT ---
@@ -2122,4 +2143,3 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
-

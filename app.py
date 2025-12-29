@@ -7,7 +7,7 @@ import streamlit as st
 import google.generativeai as genai
 from supabase import create_client, Client
 
-MAX_AI_QUOTA = 5
+MAX_AI_QUOTA = 10
 
 # Đặt đoạn này ở ngay đầu file app.py (sau các lệnh import)
 st.set_page_config(
@@ -2143,5 +2143,6 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+
 
 

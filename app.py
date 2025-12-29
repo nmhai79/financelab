@@ -524,10 +524,10 @@ with st.sidebar:
     st.markdown("---")
     #st.caption("© 2026 - Nguyễn Minh Hải", help="Finance Lab – International Finance Simulation") 
     # Tạo nút bấm trải dài hết chiều rộng sidebar
-    # Người dùng bấm vào dòng chữ bản quyền -> Hiện logo
+    # Người dùng bấm vào dòng chữ bản quyền -> Hiện About
     with st.popover("© 2026 - Nguyễn Minh Hải", use_container_width=True):        
         st.write("Mô phỏng Tài chính Quốc tế")
-        st.image("logo.png") # Nhớ thay tên file ảnh của bạn
+        st.image("about.png") # Nhớ thay tên file ảnh của bạn
     
     # st.markdown("---")
     # # --- PHẦN UI HƯỚNG DẪN CÀI ĐẶT ---
@@ -2143,4 +2143,5 @@ elif "4." in room:
     room_4_invest()
 elif "5." in room:
     room_5_macro()
+
 

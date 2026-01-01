@@ -3175,79 +3175,88 @@ def room_6_leaderboard():
 
         rows = fetch_my_attempts(mssv)
         if not rows:
-            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")            
+            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")
+        else:
+            df = pd.DataFrame(rows)
 
-        df = pd.DataFrame(rows)
-        # chuẩn hóa
-        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
-        df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
-        df["is_correct"] = df["is_correct"].astype(bool)
+            # chuẩn hóa
+            if "score" not in df.columns: df["score"] = 0
+            if "attempt_no" not in df.columns: df["attempt_no"] = 0
+            if "is_correct" not in df.columns: df["is_correct"] = False
+            if "created_at" not in df.columns: df["created_at"] = pd.NaT
+            if "exercise_code" not in df.columns: df["exercise_code"] = ""
 
-        # Best-of-3 theo từng bài
-        per_ex = (
-            df.groupby("exercise_code", as_index=False)
-            .agg(
-                best_score=("score", "max"),
-                best_correct=("is_correct", "max"),
-                attempts_done=("attempt_no", "nunique"),
-                last_submit=("created_at", "max"),
+            df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
+            df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
+            df["is_correct"] = df["is_correct"].astype(bool)
+
+            # Best-of-3 theo từng bài
+            per_ex = (
+                df.groupby("exercise_code", as_index=False)
+                .agg(
+                    best_score=("score", "max"),
+                    best_correct=("is_correct", "max"),
+                    attempts_done=("attempt_no", "nunique"),
+                    last_submit=("created_at", "max"),
+                )
+                .sort_values(["best_score", "best_correct", "attempts_done", "last_submit"],
+                            ascending=[False, False, False, False])
             )
-            .sort_values(["best_score", "best_correct", "attempts_done", "last_submit"], ascending=[False, False, False, False])
-        )
 
-        total_score = int(per_ex["best_score"].sum())
-        total_correct = int(per_ex["best_correct"].sum())
-        exercises_done = int(per_ex["exercise_code"].nunique())
-        attempts_total = int(df.shape[0])
+            total_score = int(per_ex["best_score"].sum())
+            total_correct = int(per_ex["best_correct"].sum())
+            exercises_done = int(per_ex["exercise_code"].nunique())
+            attempts_total = int(df.shape[0])
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🎯 Tổng điểm (best-of-3)", f"{total_score}")
-        c2.metric("✅ Số bài đúng", f"{total_correct}")
-        c3.metric("📌 Số mã bài đã làm", f"{exercises_done}")
-        c4.metric("🧾 Tổng lượt nộp", f"{attempts_total}")
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("🎯 Tổng điểm (best-of-3)", f"{total_score}")
+            c2.metric("✅ Số bài đúng", f"{total_correct}")
+            c3.metric("📌 Số mã bài đã làm", f"{exercises_done}")
+            c4.metric("🧾 Tổng lượt nộp", f"{attempts_total}")
 
-        st.markdown("---")
-        st.subheader("📌 Điểm tốt nhất theo từng mã bài (Best-of-3)")
+            st.markdown("---")
+            st.subheader("📌 Điểm tốt nhất theo từng mã bài (Best-of-3)")
 
-        show_ex = per_ex.rename(columns={
-            "exercise_code": "Mã bài",
-            "best_score": "Điểm cao nhất",
-            "best_correct": "Đúng (1/0)",
-            "attempts_done": "Số lần đã nộp",
-            "last_submit": "Nộp gần nhất",
-        })
-        show_ex["Đúng (1/0)"] = show_ex["Đúng (1/0)"].astype(int)
-        # Format datetime đẹp hơn (giờ VN) - chỉ cột Nộp gần nhất
-        if "Nộp gần nhất" in show_ex.columns:
-            show_ex["Nộp gần nhất"] = (
-                pd.to_datetime(show_ex["Nộp gần nhất"], errors="coerce", utc=True)
+            show_ex = per_ex.rename(columns={
+                "exercise_code": "Mã bài",
+                "best_score": "Điểm cao nhất",
+                "best_correct": "Đúng (1/0)",
+                "attempts_done": "Số lần đã nộp",
+                "last_submit": "Nộp gần nhất",
+            })
+            show_ex["Đúng (1/0)"] = show_ex["Đúng (1/0)"].astype(int)
+
+            if "Nộp gần nhất" in show_ex.columns:
+                show_ex["Nộp gần nhất"] = (
+                    pd.to_datetime(show_ex["Nộp gần nhất"], errors="coerce", utc=True)
+                    .dt.tz_convert("Asia/Ho_Chi_Minh")
+                    .dt.strftime("%Y-%m-%d %H:%M")
+                )
+
+            st.dataframe(show_ex, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+            st.subheader("🕒 Lịch sử nộp gần nhất")
+
+            recent = df.sort_values("created_at", ascending=False).head(15).copy()
+            recent = recent[["created_at","room","exercise_code","attempt_no","score","is_correct"]]
+            recent = recent.rename(columns={
+                "created_at":"Thời điểm",
+                "room":"Phòng",
+                "exercise_code":"Mã bài",
+                "attempt_no":"Lần",
+                "score":"Điểm",
+                "is_correct":"Đúng?",
+            })
+            recent["Đúng?"] = recent["Đúng?"].astype(bool).map({True:"✅", False:"❌"})
+            recent["Thời điểm"] = (
+                pd.to_datetime(recent["Thời điểm"], errors="coerce", utc=True)
                 .dt.tz_convert("Asia/Ho_Chi_Minh")
                 .dt.strftime("%Y-%m-%d %H:%M")
             )
 
-        st.dataframe(show_ex, use_container_width=True, hide_index=True)
+            st.dataframe(recent, use_container_width=True, hide_index=True)
 
-        st.markdown("---")
-        st.subheader("🕒 Lịch sử nộp gần nhất")
-        recent = df.sort_values("created_at", ascending=False).head(15).copy()
-        recent = recent[["created_at","room","exercise_code","attempt_no","score","is_correct"]]
-        recent = recent.rename(columns={
-            "created_at":"Thời điểm",
-            "room":"Phòng",
-            "exercise_code":"Mã bài",
-            "attempt_no":"Lần",
-            "score":"Điểm",
-            "is_correct":"Đúng?",
-        })
-        recent["Đúng?"] = recent["Đúng?"].astype(bool).map({True:"✅", False:"❌"})
-        recent["Thời điểm"] = (
-            pd.to_datetime(recent["Thời điểm"], errors="coerce", utc=True)
-            .dt.tz_convert("Asia/Ho_Chi_Minh")
-            .dt.strftime("%Y-%m-%d %H:%M")  
-        )
-
-
-        st.dataframe(recent, use_container_width=True, hide_index=True)
 
     # =========================================================
     # TAB 3: CLASS LEADERBOARD

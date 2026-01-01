@@ -378,6 +378,77 @@ def gen_case_R01(seed: int) -> tuple[dict, dict]:
     }
     return params, answers
 
+def gen_case_R02(seed: int) -> tuple[dict, dict]:
+    """
+    R02: So sánh Hedge Forward vs Option cho khoản nợ USD
+    - Sinh Spot USD/VND, lãi suất -> tính Forward (ASK)
+    - Sinh Option: strike K, premium (VND/USD)
+    - Sinh kịch bản Spot tại đáo hạn (S_T)
+    Yêu cầu SV: tính chi phí Forward, chi phí Option, và chọn phương án rẻ hơn.
+    """
+    rng = random.Random(int(seed))
+
+    usd_amount = rng.randrange(200_000, 2_000_001, 50_000)
+    days = rng.choice([30, 60, 90, 180])
+
+    # Spot USD/VND
+    spot_bid = rng.randrange(23200, 25801, 10)
+    spr = rng.randrange(20, 71, 5)
+    spot_ask = spot_bid + spr
+
+    # Lãi suất (năm)
+    i_vnd = rng.choice([0.045, 0.050, 0.055, 0.060, 0.065, 0.070, 0.075, 0.080])
+    i_usd = rng.choice([0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050, 0.055])
+
+    t = days / 360.0
+    factor = (1.0 + i_vnd * t) / (1.0 + i_usd * t)
+
+    fwd_ask = int(round(spot_ask * factor))
+    fwd_bid = int(round(spot_bid * factor))
+
+    # Option: USD Call (DN mua USD để trả nợ)
+    # Strike quanh forward ± (0..200) cho đa dạng
+    strike = int(round(fwd_ask + rng.choice([-200, -100, 0, 100, 200])))
+    premium = rng.choice([30, 40, 50, 60, 70, 80, 100, 120])   # VND/USD
+
+    # Kịch bản Spot tại đáo hạn (S_T ask) quanh forward ± (0..400)
+    sT = int(round(fwd_ask + rng.choice([-400, -250, -150, -50, 50, 150, 250, 400])))
+
+    # Chi phí hedge:
+    forward_cost = int(round(usd_amount * fwd_ask))
+
+    # Option cost: trả premium + mua USD theo min(S_T, K) (vì có quyền mua tại K)
+    option_rate = min(sT, strike) + premium  # VND/USD (all-in)
+    option_cost = int(round(usd_amount * option_rate))
+
+    if option_cost < forward_cost:
+        best = "OPTION"
+    elif option_cost > forward_cost:
+        best = "FORWARD"
+    else:
+        best = "TIE"
+
+    params = {
+        "usd_amount": usd_amount,
+        "days": days,
+        "spot_bid": spot_bid,
+        "spot_ask": spot_ask,
+        "i_vnd": i_vnd,
+        "i_usd": i_usd,
+        "fwd_bid": fwd_bid,
+        "fwd_ask": fwd_ask,
+        "strike": strike,
+        "premium": premium,
+        "spot_T": sT,
+    }
+
+    answers = {
+        "forward_cost": forward_cost,
+        "option_cost": option_cost,
+        "best_choice": best,  # "FORWARD" | "OPTION" | "TIE"
+    }
+    return params, answers
+
 def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
     """Kiểm tra attempt đã nộp chưa."""
     if not supabase_client:
@@ -875,6 +946,150 @@ def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
         )
         st.rerun()
 
+def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code = str(ex_code).strip().upper()
+
+    # Guard an toàn giống D01/D02/R01
+    if room_key != "RISK" or ex_code != "R02":
+        return
+
+    # 1) Nếu attempt đã nộp -> khóa và hiển thị lại từ DB
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.write("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- Khoản nợ: **{params.get('usd_amount','-'):,.0f} USD**, đáo hạn **{params.get('days','-')} ngày**")
+        st.write(f"- Spot USD/VND: **{params.get('spot_bid','-'):,.0f} / {params.get('spot_ask','-'):,.0f}**")
+        st.write(f"- Forward USD/VND: **{params.get('fwd_bid','-'):,.0f} / {params.get('fwd_ask','-'):,.0f}**")
+        st.write(f"- Option Call: Strike **{params.get('strike','-'):,.0f}**, Premium **{params.get('premium','-'):,.0f} VND/USD**")
+        st.write(f"- Kịch bản Spot tại đáo hạn (S_T): **{params.get('spot_T','-'):,.0f}**")
+
+        st.markdown("**Đáp án chuẩn (để đối chiếu):**")
+        st.success(
+            f"Chi phí Forward = **{ans.get('forward_cost','-'):,.0f} VND** | "
+            f"Chi phí Option = **{ans.get('option_cost','-'):,.0f} VND** | "
+            f"Chọn: **{ans.get('best_choice','-')}**"
+        )
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_R02(seed)
+
+    # 3) Start time (optional)
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) Render đề
+    st.markdown(
+        f"""
+<div class="role-card">
+  <div class="role-title">🧾 Bài R02 — So sánh Hedge Forward vs Option (Call USD)</div>
+  <div class="mission-text">
+    DN có khoản nợ <b>{params['usd_amount']:,.0f} USD</b> đáo hạn sau <b>{params['days']} ngày</b>.
+    So sánh 2 phương án hedge:
+    <br>① <b>Forward</b> theo báo giá kỳ hạn.
+    <br>② <b>Option Call USD</b> (Strike + Premium), kịch bản tại đáo hạn có Spot S<sub>T</sub>.
+    <br>Hãy tính <b>Chi phí Forward</b>, <b>Chi phí Option</b> và chọn phương án <b>rẻ hơn</b>.
+    <br>(Làm tròn đến <b>VND</b>)
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.markdown("##### 🌐 Spot USD/VND")
+        st.write(f"BID: **{params['spot_bid']:,.0f}**")
+        st.write(f"ASK: **{params['spot_ask']:,.0f}**")
+    with c2:
+        st.markdown("##### 📌 Forward USD/VND")
+        st.write(f"BID: **{params['fwd_bid']:,.0f}**")
+        st.write(f"ASK: **{params['fwd_ask']:,.0f}**")
+    with c3:
+        st.markdown("##### 🎯 Option Call USD")
+        st.write(f"Strike (K): **{params['strike']:,.0f}**")
+        st.write(f"Premium: **{params['premium']:,.0f} VND/USD**")
+
+    st.markdown("##### 🔮 Kịch bản tại đáo hạn")
+    st.write(f"Spot tại đáo hạn S_T (ASK): **{params['spot_T']:,.0f}**")
+
+    st.markdown("---")
+    st.caption("✍️ Nhập kết quả (VND).")
+
+    a1, a2 = st.columns(2)
+    with a1:
+        in_forward_cost = st.number_input(
+            "Chi phí Hedge bằng Forward (VND)",
+            min_value=0.0, step=100000.0, format="%.0f",
+            key=f"r02_forward_cost_{attempt_no}"
+        )
+    with a2:
+        in_option_cost = st.number_input(
+            "Chi phí Hedge bằng Option (VND)",
+            min_value=0.0, step=100000.0, format="%.0f",
+            key=f"r02_option_cost_{attempt_no}"
+        )
+
+    choice = st.radio(
+        "Chọn phương án rẻ hơn:",
+        options=["FORWARD", "OPTION", "TIE"],
+        horizontal=True,
+        key=f"r02_choice_{attempt_no}"
+    )
+
+    # 5) Nộp bài
+    # Tolerance theo quy mô khoản nợ: sai lệch do nhập/làm tròn
+    TOL_RATE = 5  # ±5 VND/USD
+    tol_cost = int(params["usd_amount"] * TOL_RATE)
+
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_r02_{attempt_no}"):
+        ok_forward = abs(int(in_forward_cost) - int(answers["forward_cost"])) <= tol_cost
+        ok_option = abs(int(in_option_cost) - int(answers["option_cost"])) <= tol_cost
+        ok_choice = (choice == answers["best_choice"])
+
+        is_ok = bool(ok_forward and ok_option and ok_choice)
+        score = 10 if is_ok else 0
+        duration_sec = int(time.time() - st.session_state[start_key])
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": room_key,
+            "exercise_code": ex_code,
+            "attempt_no": int(attempt_no),
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": is_ok,
+            "score": int(score),
+            "duration_sec": int(duration_sec),
+            "note": f"R02 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. (0 điểm)")
+
+        st.info(
+            f"📌 Đáp án chuẩn: Forward = **{answers['forward_cost']:,.0f} VND** | "
+            f"Option = **{answers['option_cost']:,.0f} VND** | "
+            f"Chọn: **{answers['best_choice']}**"
+        )
+        st.rerun()
+
 # =========================================================
 # EXERCISE ROUTER MAP: (ROOM, EX_CODE) -> render_function
 # Mỗi render_function phải có chữ ký: fn(mssv: str, ex_code: str, attempt_no: int)
@@ -884,6 +1099,7 @@ EX_RENDERERS = {
     ("DEALING", "D01"): render_exercise_D01,
     ("DEALING", "D02"): render_exercise_D02,    
     ("RISK", "R01"): render_exercise_R01,
+    ("RISK", "R02"): render_exercise_R02,
     # ("TRADE", "T01"): render_exercise_T01,
     # ("INVEST", "I01"): render_exercise_I01,
     # ("MACRO", "M01"): render_exercise_M01,

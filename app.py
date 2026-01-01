@@ -42,49 +42,68 @@ def init_supabase():
 
 supabase_client = init_supabase()
 
-# ------------------------------------------------------------------
-# GIỮ NGUYÊN HÀM ĐỌC EXCEL CỦA BẠN (Code cũ)
-# ------------------------------------------------------------------
-@st.cache_resource
-def load_valid_students():
+@st.cache_data(show_spinner=False)
+def load_student_registry():
+    """
+    Đọc dssv.xlsx và trả về dict:
+    REG[mssv] = {"hoten": "...", "pin": "..."}
+    """
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(current_dir, "dssv.xlsx")
-        df = pd.read_excel(file_path, dtype=str)
-        # Chuẩn hóa: viết hoa, xóa khoảng trắng thừa
-        valid_ids = df['MSSV'].astype(str).str.strip().str.upper().tolist() 
-        return valid_ids
+        df = pd.read_excel(file_path, dtype=str).fillna("")
+
+        # Chuẩn hóa tên cột linh hoạt
+        cols = {c.strip().lower(): c for c in df.columns}
+
+        mssv_col = cols.get("mssv") or cols.get("ma sv") or cols.get("student_id") or cols.get("student id")
+        pin_col  = cols.get("pin") or cols.get("pin4") or cols.get("pass") or cols.get("password")
+        hoten_col = cols.get("hoten") or cols.get("họ tên") or cols.get("ho ten") or cols.get("fullname") or cols.get("full name")
+
+        if not mssv_col or not pin_col:
+            st.error("⚠️ File dssv.xlsx thiếu cột MSSV hoặc PIN.")
+            return {}
+
+        df[mssv_col] = df[mssv_col].astype(str).str.strip().str.upper()
+        df[pin_col]  = df[pin_col].astype(str).str.strip()
+
+        if hoten_col:
+            df[hoten_col] = df[hoten_col].astype(str).str.strip()
+        else:
+            df["__hoten__"] = ""
+            hoten_col = "__hoten__"
+
+        reg = {}
+        for _, r in df.iterrows():
+            m = (r.get(mssv_col) or "").strip().upper()
+            p = (r.get(pin_col) or "").strip()
+            h = (r.get(hoten_col) or "").strip()
+            if m and p:
+                reg[m] = {"hoten": h, "pin": p}
+        return reg
+
     except Exception as e:
         st.error(f"⚠️ Lỗi đọc file Excel: {e}")
-        return []
+        return {}
 
-@st.cache_resource
-def load_students_map():
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(current_dir, "dssv.xlsx")
-    df = pd.read_excel(file_path, dtype=str).fillna("")
-
-    # Chuẩn hóa MSSV
-    df["MSSV"] = df["MSSV"].astype(str).str.strip().str.upper()
-
-    # Bắt linh hoạt cột họ tên
-    name_col = None
-    for c in ["HoTen", "Họ tên", "HOTEN", "FullName", "Name"]:
-        if c in df.columns:
-            name_col = c
-            break
-
-    if name_col is None:
-        # Nếu chưa có cột tên thì trả rỗng để vẫn chạy được
-        return {m: "" for m in df["MSSV"].tolist()}
-
-    df[name_col] = df[name_col].astype(str).str.strip()
-    return dict(zip(df["MSSV"], df[name_col]))
 
 def get_student_name(mssv: str) -> str:
     m = str(mssv).strip().upper()
-    mp = load_students_map()
-    return mp.get(m, "")
+    reg = load_student_registry()
+    return (reg.get(m, {}) or {}).get("hoten", "").strip()
+
+def verify_mssv_pin(mssv: str, pin: str) -> tuple[bool, str]:
+    reg = load_student_registry()
+    m = str(mssv).strip().upper()
+    p = str(pin).strip()
+    info = reg.get(m)
+
+    if not info:
+        return False, "❌ MSSV không có trong danh sách lớp."
+    if p != str(info.get("pin", "")).strip():
+        return False, "❌ PIN không đúng."
+    return True, ""
+
 
 # ------------------------------------------------------------------
 # PHẦN CODE MỚI: QUẢN LÝ QUOTA BẰNG SUPABASE
@@ -132,7 +151,7 @@ def verify_and_check_quota(student_id, max_limit=MAX_AI_QUOTA):
     2. Check Supabase xem còn lượt không? (Quota)
     """
     # Load danh sách cho phép từ Excel
-    valid_list = load_valid_students()
+    valid_list = load_student_registry()
     
     # Chuẩn hóa input đầu vào (Viết hoa để khớp với Excel/DB)
     clean_id = str(student_id).strip().upper()
@@ -726,7 +745,7 @@ with st.sidebar:
     input_mssv = input_mssv_raw.upper()
     
     # 2. Xử lý logic xác thực
-    valid_list = list(load_students_map().keys()) # = load_valid_students() # Hàm load Excel (đã có ở trên)
+    valid_list = list(load_student_registry().keys()) 
     
     # Mặc định là chưa đăng nhập
     st.session_state['CURRENT_USER'] = None 
@@ -2709,55 +2728,66 @@ def room_6_leaderboard():
         unsafe_allow_html=True,
     )
 
-    # ====== YÊU CẦU ĐĂNG NHẬP MSSV RIÊNG CHO ROOM NÀY ======
+    # ====== LOGIN MSSV + PIN (CHỈ ROOM 6) ======
     if "LAB_MSSV" not in st.session_state:
         st.session_state["LAB_MSSV"] = ""
+    if "LAB_AUTH" not in st.session_state:
+        st.session_state["LAB_AUTH"] = False
 
-    st.caption("🔒 Vui lòng nhập MSSV hợp lệ (theo danh sách lớp) để làm bài tập và xem bảng xếp hạng.")
+    with st.container():
+        st.caption("🔒 Nhập **MSSV + PIN** (theo danh sách lớp) để xem bài tập và bảng xếp hạng.")
+        col1, col2 = st.columns([1.2, 1.0])
 
-    # Nếu CHƯA có MSSV -> hiện form đăng nhập
-    if not st.session_state["LAB_MSSV"]:
-        lab_input = st.text_input(
-            "Nhập MSSV để vào Phòng Bảng vàng:",
-            value="",
-            key="lab_mssv_input",
-        )
+        with col1:
+            lab_input = st.text_input(
+                "MSSV",
+                value=st.session_state["LAB_MSSV"],
+                key="lab_mssv_input",
+            )
+        with col2:
+            lab_pin = st.text_input(
+                "PIN",
+                value="",
+                type="password",
+                key="lab_pin_input",
+                help="PIN trong file dssv.xlsx",
+            )
 
-        if st.button("✅ Xác nhận MSSV", use_container_width=True, key="btn_lab_login"):
-            clean_id = str(lab_input).strip().upper()
-            valid_list = load_valid_students()  # dùng lại Excel dssv.xlsx
+        colA, colB = st.columns([1, 1])
+        with colA:
+            if st.button("✅ Đăng nhập", use_container_width=True, key="btn_lab_login"):
+                clean_id = str(lab_input).strip().upper()
+                clean_pin = str(lab_pin).strip()
 
-            if clean_id not in valid_list:
-                st.error("❌ MSSV không hợp lệ hoặc không có trong danh sách lớp.")
-                st.stop()
+                ok, msg = verify_mssv_pin(clean_id, clean_pin)
+                if not ok:
+                    st.error(msg)
+                    st.session_state["LAB_MSSV"] = ""
+                    st.session_state["LAB_AUTH"] = False
+                    st.stop()
 
-            st.session_state["LAB_MSSV"] = clean_id
-            hoten = get_student_name(clean_id)
-            hello = f"✅ Xin chào: {hoten} ({clean_id})" if hoten else f"✅ Xin chào: {clean_id}"
-            st.success(hello)
-            st.rerun()
+                st.session_state["LAB_MSSV"] = clean_id
+                st.session_state["LAB_AUTH"] = True
 
-    # Nếu ĐÃ có MSSV -> hiển thị lời chào + nút đổi MSSV (ẩn gọn)
-    else:
-        clean_id = str(st.session_state["LAB_MSSV"]).strip().upper()
-        hoten = get_student_name(clean_id)
-        hello = f"✅ Xin chào: {hoten} ({clean_id})" if hoten else f"✅ Xin chào: {clean_id}"
-        st.success(hello)
-
-        with st.expander("⚙️ Tùy chọn", expanded=False):
-            if st.button("🔁 Đổi MSSV", use_container_width=True, key="btn_change_mssv"):
-                st.session_state["LAB_MSSV"] = ""
+                hoten = get_student_name(clean_id)
+                st.success(f"✅ Xin chào: {hoten} ({clean_id})" if hoten else f"✅ Xin chào: {clean_id}")
                 st.rerun()
 
-    # Nếu chưa đăng nhập thì KHÔNG cho hiện tab
-    if not st.session_state["LAB_MSSV"]:
+        with colB:
+            if st.button("🚪 Đổi SV / Thoát", use_container_width=True, key="btn_lab_logout"):
+                st.session_state["LAB_MSSV"] = ""
+                st.session_state["LAB_AUTH"] = False
+                st.rerun()
+
+    # Nếu chưa auth thì KHÔNG cho hiện tab
+    if not st.session_state.get("LAB_AUTH", False) or not st.session_state.get("LAB_MSSV"):
         st.stop()
-        # ====== HIỂN THỊ TAB BẢNG VÀNG ======
+
 
     tab_practice, tab_my, tab_class = st.tabs(
         [
             "🎯 Làm bài tập",
-            "🥇 Bảng vàng cá nhân",
+            "🥇 Thành tích cá nhân",
             "🏫 Bảng xếp hạng lớp",
         ]
     )
@@ -2851,7 +2881,6 @@ def room_6_leaderboard():
         st.subheader("🥇 Thành tích cá nhân")
         st.info(
             """
-Hiển thị:
 - Tổng điểm tích lũy
 - Số bài đã làm / đúng
 """
@@ -2859,8 +2888,7 @@ Hiển thị:
 
         mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
         hoten = get_student_name(mssv)
-
-        st.markdown("### 🥇 Bảng vàng cá nhân (My Stats)")
+        
         if hoten:
             st.success(f"Xin chào **{hoten}** ({mssv})")
         else:
@@ -2868,7 +2896,7 @@ Hiển thị:
 
         rows = fetch_my_attempts(mssv)
         if not rows:
-            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài** để bắt đầu.")
+            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")
             st.stop()
 
         df = pd.DataFrame(rows)
@@ -2959,7 +2987,7 @@ Hiển thị:
         my_name = get_student_name(mssv)
 
         st.markdown("### 🏫 Bảng xếp hạng lớp (Class Leaderboard)")
-        st.caption("Xếp hạng dựa trên **tổng điểm best-of-3** của mỗi mã bài. (Không dùng thời gian)")
+        st.caption("Xếp hạng dựa trên **tổng điểm best-of-3** của mỗi mã bài.")
 
         # 1) Ưu tiên view
         data = fetch_class_leaderboard_from_view(limit=300)

@@ -784,6 +784,119 @@ def gen_case_I02(seed: int) -> tuple[dict, dict]:
     }
     return params, answers
 
+def gen_case_M01(seed: int) -> tuple[dict, dict]:
+    """
+    M01: Cú sốc tỷ giá lên nợ công
+    - Random: nợ nước ngoài (tỷ USD), tỷ giá gốc, shock %
+    - Yêu cầu SV tính: tỷ giá mới, gánh nặng tăng thêm (nghìn tỷ VND)
+    """
+    import numpy as np
+
+    # tránh seed quá lớn (an toàn cho DB nếu bạn có lưu seed)
+    seed = int(seed) % 2_000_000_000
+    rng = np.random.default_rng(seed)
+
+    debt_usd_bn = int(rng.integers(20, 101))  # 20..100 (tỷ USD)
+    base_rate = int(rng.integers(23000, 27001) // 50 * 50)  # bội 50 cho “đẹp”
+    shock_pct = float(rng.choice([5, 7, 10, 12, 15, 18, 20, 25, 30]))
+
+    new_rate = int(round(base_rate * (1 + shock_pct / 100), 0))
+
+    # Quy đổi đơn vị:
+    # debt_usd_bn (tỷ USD) * base_rate (VND/USD) -> nghìn tỷ VND vì: bn * rate / 1000
+    base_debt_tril = round(debt_usd_bn * base_rate / 1000, 1)
+    new_debt_tril = round(debt_usd_bn * new_rate / 1000, 1)
+    increase_tril = round(new_debt_tril - base_debt_tril, 1)
+
+    params = {
+        "debt_usd_bn": debt_usd_bn,
+        "base_rate": base_rate,
+        "shock_pct": shock_pct,
+    }
+    answers = {
+        "new_rate": new_rate,
+        "increase_tril": increase_tril,
+        "base_debt_tril": base_debt_tril,
+        "new_debt_tril": new_debt_tril,
+    }
+    return params, answers
+
+def gen_case_M02(seed: int) -> tuple[dict, dict]:
+    """
+    M02: Carry Trade Unwind (Option A)
+    SV nhập:
+    1) VND nhận được khi mở carry (JPY->VND)
+    2) P/L (VND) sau horizon_days khi JPY mạnh lên shock_pct
+    3) Margin call? dựa equity_vnd và margin_trigger
+    """
+    import numpy as np
+
+    seed = int(seed) % 2_000_000_000
+    rng = np.random.default_rng(seed)
+
+    # Notional vay JPY (triệu JPY -> đổi ra JPY)
+    notional_mjpy = int(rng.integers(50, 301))          # 50..300 (million JPY)
+    notional_jpy = int(notional_mjpy * 1_000_000)
+
+    # Spot JPY/VND (VND/JPY) - làm tròn theo bước 0.5 cho "đẹp"
+    s0 = float(rng.integers(160, 211) / 10)             # 16.0 .. 21.0 (VND/JPY)
+
+    # Lãi suất năm
+    i_vnd = float(rng.choice([0.05, 0.06, 0.07, 0.08, 0.09, 0.10]))
+    i_jpy = float(rng.choice([0.001, 0.003, 0.005, 0.01, 0.015, 0.02]))
+
+    horizon_days = int(rng.choice([30, 60, 90]))
+    t = horizon_days / 360.0
+
+    # Shock: JPY mạnh lên so với VND => JPY/VND tăng => VND/JPY (s) cũng tăng
+    shock_pct = float(rng.choice([3, 5, 8, 10, 12, 15]))
+    s1 = s0 * (1 + shock_pct / 100)
+
+    # Vốn tự có + ngưỡng margin call
+    equity_vnd = int(rng.integers(100, 401) * 1_000_000)  # 100..400 triệu VND
+    margin_trigger = float(rng.choice([0.10, 0.15]))      # 10% hoặc 15%
+
+    # ---- Tính đáp án ----
+    vnd_open = notional_jpy * s0
+    vnd_end = vnd_open * (1 + i_vnd * t)
+
+    jpy_debt = notional_jpy * (1 + i_jpy * t)
+    jpy_repay_capacity = vnd_end / s1
+
+    pl_jpy = jpy_repay_capacity - jpy_debt
+    pl_vnd = pl_jpy * s1  # định giá theo tỷ giá unwind
+
+    loss_vnd = max(0.0, -pl_vnd)
+    loss_pct = loss_vnd / max(1.0, equity_vnd)
+    margin_call = bool(loss_pct >= margin_trigger)
+
+    # Làm tròn để chấm dễ (VND làm tròn 1,000)
+    vnd_open_r = int(round(vnd_open / 1000) * 1000)
+    pl_vnd_r = int(round(pl_vnd / 1000) * 1000)
+
+    params = {
+        "notional_mjpy": notional_mjpy,
+        "notional_jpy": notional_jpy,
+        "s0": s0,
+        "i_vnd": i_vnd,
+        "i_jpy": i_jpy,
+        "horizon_days": horizon_days,
+        "shock_pct": shock_pct,
+        "s1": s1,
+        "equity_vnd": equity_vnd,
+        "margin_trigger": margin_trigger,
+    }
+    answers = {
+        "vnd_open": vnd_open_r,
+        "pl_vnd": pl_vnd_r,
+        "margin_call": margin_call,
+        # thêm vài số để bạn debug/giải thích nếu cần
+        "vnd_end": float(vnd_end),
+        "jpy_debt": float(jpy_debt),
+        "loss_pct": float(loss_pct),
+    }
+    return params, answers
+
 #======= KẾT THÚC CÁC HÀM gen_case ======
 
 def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
@@ -880,7 +993,7 @@ EXERCISE_CATALOG = {
     # PHÒNG 5: MACRO STRATEGY
     "MACRO": [
         {"code": "M01", "title": "Cú sốc tỷ giá lên Nợ công (tỷ giá mới + gánh nặng tăng thêm)"},
-        {"code": "M02", "title": "Carry Trade: ROI/P&L khi chênh lệch lãi suất + biến động FX"},
+        {"code": "M02", "title": "Carry Trade Unwind (JPY funding → VND asset) + Margin call"},
     ],
 }
 
@@ -1934,7 +2047,296 @@ def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             st.info(f"📌 Đáp án chuẩn: IRR = **{answers['irr_pct']}%** | Quyết định: **{dec_vn}**")
 
         st.rerun()
-        
+
+def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code = str(ex_code).strip().upper()
+    attempt_no = int(attempt_no)
+
+    if ex_code != "M01":
+        return  # an toàn
+
+    # 1) Nếu attempt đã nộp -> khóa, hiển thị lại đề + đáp án
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.markdown("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- Nợ nước ngoài: **{params.get('debt_usd_bn','-')} tỷ USD**")
+        st.write(f"- Tỷ giá gốc: **{params.get('base_rate','-'):,.0f} VND/USD**")
+        st.write(f"- Mất giá: **{params.get('shock_pct','-')}%**")
+
+        st.markdown("**Đáp án chuẩn (đối chiếu học tập):**")
+        st.success(
+            f"Tỷ giá mới: **{int(ans.get('new_rate',0)):,.0f} VND/USD**  |  "
+            f"Gánh nặng tăng thêm: **{ans.get('increase_tril','-')} nghìn tỷ VND**"
+        )
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_M01(seed)
+
+    # 3) Ghi thời điểm bắt đầu (nếu sau này bạn muốn tính thời gian)
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) UI đề bài
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài M01 — Cú sốc tỷ giá lên Nợ công</div>
+  <div class="mission-text">
+    Bạn là <b>Macro Strategist</b>. Tính <b>tỷ giá mới</b> sau cú sốc và <b>gánh nặng nợ tăng thêm</b> do VND mất giá.
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Nợ nước ngoài", f"{params['debt_usd_bn']} tỷ USD")
+    with c2:
+        st.metric("Tỷ giá gốc", f"{params['base_rate']:,.0f} VND/USD")
+    with c3:
+        st.metric("Mức mất giá", f"{params['shock_pct']}%")
+
+    st.markdown("---")
+    st.caption("✍️ Nhập đáp án:")
+    a1, a2 = st.columns(2)
+    with a1:
+        in_new_rate = st.number_input(
+            "Tỷ giá mới (VND/USD)",
+            min_value=0.0, step=1.0, format="%.0f",
+            key=f"m01_newrate_{attempt_no}"
+        )
+    with a2:
+        in_increase = st.number_input(
+            "Gánh nặng tăng thêm (nghìn tỷ VND)",
+            min_value=0.0, step=0.1, format="%.1f",
+            key=f"m01_increase_{attempt_no}"
+        )
+
+    # 5) Chấm điểm
+    # - new_rate: cho lệch ±5 VND
+    # - increase_tril: cho lệch ±0.2 nghìn tỷ (200 tỷ VND) do làm tròn
+    TOL_RATE = 5
+    TOL_TRIL = 0.2
+
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_m01_{attempt_no}"):
+        ok_rate = abs(int(in_new_rate) - int(answers["new_rate"])) <= TOL_RATE
+        ok_inc = abs(float(in_increase) - float(answers["increase_tril"])) <= TOL_TRIL
+
+        is_ok = bool(ok_rate and ok_inc)
+
+        # điểm: 10 nếu đúng hoàn toàn, 4 nếu đúng 1 phần (đỡ “gắt”), 0 nếu sai hết
+        if is_ok:
+            score = 10
+        elif ok_rate or ok_inc:
+            score = 4
+        else:
+            score = 0
+
+        duration_sec = int(time.time() - st.session_state.get(start_key, time.time()))
+
+        payload = {
+            "mssv": mssv,
+            "hoten": None,      # nếu bạn đã map họ tên từ Excel thì fill ở đây
+            "lop": None,
+            "room": room_key,   # "MACRO"
+            "exercise_code": ex_code,  # "M01"
+            "attempt_no": attempt_no,
+            "seed": int(int(seed) % 2_000_000_000),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": bool(is_ok),
+            "score": int(score),
+            "duration_sec": int(duration_sec),
+            "note": f"M01 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            return
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        elif score > 0:
+            st.warning(f"🟡 GẦN ĐÚNG! Bạn được **+{score} điểm** (đúng 1 phần).")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+
+        st.info(
+            f"📌 Đáp án: Tỷ giá mới **{answers['new_rate']:,.0f}** | "
+            f"Tăng thêm **{answers['increase_tril']} nghìn tỷ VND**"
+        )
+        st.rerun()
+
+def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code = str(ex_code).strip().upper()
+    attempt_no = int(attempt_no)
+
+    if ex_code != "M02":
+        return  # an toàn
+
+    # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại đề + đáp án
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.markdown("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- Vay: **{params.get('notional_mjpy','-')} triệu JPY**")
+        st.write(f"- Spot JPY/VND (t0): **{float(params.get('s0',0)):,.1f} VND/JPY**")
+        st.write(f"- iVND: **{float(params.get('i_vnd',0))*100:.1f}%/năm**, iJPY: **{float(params.get('i_jpy',0))*100:.2f}%/năm**")
+        st.write(f"- Kỳ hạn: **{params.get('horizon_days','-')} ngày**")
+        st.write(f"- Shock: **JPY mạnh lên {params.get('shock_pct','-')}%**")
+        st.write(f"- Equity: **{int(params.get('equity_vnd',0)):,.0f} VND**, Margin trigger: **{float(params.get('margin_trigger',0))*100:.0f}%**")
+
+        st.markdown("**Đáp án chuẩn (đối chiếu học tập):**")
+        mc = "YES" if bool(ans.get("margin_call", False)) else "NO"
+        st.success(
+            f"VND mở carry: **{int(ans.get('vnd_open',0)):,.0f}** | "
+            f"P/L: **{int(ans.get('pl_vnd',0)):,.0f} VND** | "
+            f"Margin call: **{mc}**"
+        )
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_M02(seed)
+
+    # 3) Start time (nếu sau này cần)
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) UI đề bài
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài M02 — Carry Trade Unwind (JPY funding → VND asset)</div>
+  <div class="mission-text">
+    Bạn vay JPY (lãi suất thấp) đổi sang VND để đầu tư (lãi suất cao). Khi thị trường risk-off, JPY mạnh lên → unwind.
+    Hãy tính: <b>(1) VND nhận khi mở carry</b>, <b>(2) P/L (VND)</b>, <b>(3) Có margin call không</b>.
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric("Vay (Funding)", f"{params['notional_mjpy']} triệu JPY")
+        st.metric("Spot t0 (JPY/VND)", f"{params['s0']:.1f} VND/JPY")
+    with c2:
+        st.metric("iVND", f"{params['i_vnd']*100:.1f}%/năm")
+        st.metric("iJPY", f"{params['i_jpy']*100:.2f}%/năm")
+    with c3:
+        st.metric("Kỳ hạn", f"{params['horizon_days']} ngày")
+        st.metric("Shock (JPY mạnh lên)", f"{params['shock_pct']:.0f}%")
+
+    st.markdown("---")
+    st.caption("Thông tin margin:")
+    m1, m2 = st.columns(2)
+    with m1:
+        st.write(f"Equity ban đầu: **{params['equity_vnd']:,.0f} VND**")
+    with m2:
+        st.write(f"Margin trigger: **{params['margin_trigger']*100:.0f}% (lỗ/equity)**")
+
+    st.markdown("---")
+    st.caption("✍️ Nhập đáp án (làm tròn **1,000 VND** để nhập nhanh):")
+
+    a1, a2, a3 = st.columns([1.3, 1.3, 1.0])
+    with a1:
+        in_vnd_open = st.number_input(
+            "1) VND khi mở carry (JPY→VND)",
+            min_value=0.0, step=1000.0, format="%.0f",
+            key=f"m02_vndopen_{attempt_no}"
+        )
+    with a2:
+        in_pl_vnd = st.number_input(
+            "2) P/L (VND) sau unwind",
+            min_value=-1e15, max_value=1e15, step=1000.0, format="%.0f",
+            key=f"m02_plvnd_{attempt_no}"
+        )
+    with a3:
+        in_mc = st.selectbox(
+            "3) Margin call?",
+            options=["NO", "YES"],
+            index=0,
+            key=f"m02_mc_{attempt_no}",
+        )
+
+    # 5) Chấm theo “mỗi ý 1 phần điểm”
+    # đề xuất trọng số: open=3, pl=5, margin=2 => tổng 10
+    W_OPEN, W_PL, W_MC = 3, 5, 2
+
+    # tolerance
+    TOL_OPEN = 2000  # ±2,000 VND
+    # P/L: cho lệch 0.5% hoặc tối thiểu 200,000 VND
+    pl_true = int(answers["pl_vnd"])
+    TOL_PL = max(200_000, int(round(abs(pl_true) * 0.005)))
+
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_m02_{attempt_no}"):
+        ok_open = abs(int(in_vnd_open) - int(answers["vnd_open"])) <= TOL_OPEN
+        ok_pl = abs(int(in_pl_vnd) - int(answers["pl_vnd"])) <= TOL_PL
+        ok_mc = (str(in_mc).strip().upper() == ("YES" if answers["margin_call"] else "NO"))
+
+        score = 0
+        score += W_OPEN if ok_open else 0
+        score += W_PL if ok_pl else 0
+        score += W_MC if ok_mc else 0
+
+        is_correct = bool(score == 10)
+        duration_sec = int(time.time() - st.session_state.get(start_key, time.time()))
+
+        payload = {
+            "mssv": mssv,
+            "hoten": None,
+            "lop": None,
+            "room": room_key,           # "MACRO"
+            "exercise_code": ex_code,   # "M02"
+            "attempt_no": attempt_no,
+            "seed": int(int(seed) % 2_000_000_000),
+            "params_json": params,
+            "answer_json": {
+                "vnd_open": int(answers["vnd_open"]),
+                "pl_vnd": int(answers["pl_vnd"]),
+                "margin_call": bool(answers["margin_call"]),
+            },
+            "is_correct": is_correct,
+            "score": int(score),
+            "duration_sec": int(duration_sec),
+            "note": f"M02 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            return
+
+        # Feedback theo từng ý
+        st.markdown("### ✅ Kết quả chấm")
+        st.write(f"- (1) VND mở carry: {'✅' if ok_open else '❌'}  (+{W_OPEN if ok_open else 0})")
+        st.write(f"- (2) P/L (VND): {'✅' if ok_pl else '❌'}  (+{W_PL if ok_pl else 0})")
+        st.write(f"- (3) Margin call: {'✅' if ok_mc else '❌'}  (+{W_MC if ok_mc else 0})")
+        st.success(f"🎯 Tổng điểm lần này: **{score}/10**")
+
+        mc_ans = "YES" if answers["margin_call"] else "NO"
+        st.info(
+            f"📌 Đáp án: VND mở carry **{answers['vnd_open']:,.0f}** | "
+            f"P/L **{answers['pl_vnd']:,.0f} VND** | "
+            f"Margin call **{mc_ans}**"
+        )
+
+        st.rerun()
+
 #====== KẾT THÚC ĐỊNH NGHĨA HÀM RENDER CHO CÁC BÀI TẬP ======#
 
 # =========================================================
@@ -1951,7 +2353,8 @@ EX_RENDERERS = {
     ("TRADE", "T02"): render_exercise_T02,
     ("INVEST", "I01"): render_exercise_I01,
     ("INVEST", "I02"): render_exercise_I02,
-    # ("MACRO", "M01"): render_exercise_M01,
+    ("MACRO", "M01"): render_exercise_M01,
+    ("MACRO", "M02"): render_exercise_M02,
 }
 
 

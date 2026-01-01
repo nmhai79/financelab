@@ -3335,9 +3335,9 @@ def room_6_leaderboard():
         # Bộ lọc/search
         c1, c2 = st.columns([2, 1])
         with c1:
-            kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key="lb_search")
+            kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key=f"lb_search_{mssv}")
         with c2:
-            top_n = st.selectbox("Hiển thị Top", [20, 50, 100, 200], index=1, key="lb_top_n")
+            top_n = st.selectbox("Hiển thị Top", [20, 50, 100, 200], index=1, key=f"lb_top_n_{mssv}")
 
         show = df.copy()
         if kw.strip():

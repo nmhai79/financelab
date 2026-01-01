@@ -3176,7 +3176,7 @@ def room_6_leaderboard():
         rows = fetch_my_attempts(mssv)
         if not rows:
             st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")
-            st.stop()
+            return
 
         df = pd.DataFrame(rows)
         # chuẩn hóa

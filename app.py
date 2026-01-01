@@ -658,6 +658,134 @@ def gen_case_T02(seed: int) -> tuple[dict, dict]:
 
     return params, answers
 
+def gen_case_I01(seed: int) -> tuple[dict, dict]:
+    rng = np.random.default_rng(int(seed))
+
+    # Initial investment (USD)
+    I0 = int(rng.integers(80_000, 200_001) // 1000 * 1000)
+
+    # 3-year cash flows (USD)
+    cf1 = int(rng.integers(30_000, 90_001) // 1000 * 1000)
+    cf2 = int(rng.integers(30_000, 90_001) // 1000 * 1000)
+    cf3 = int(rng.integers(30_000, 90_001) // 1000 * 1000)
+
+    # Discount rate (USD) 8% - 15%
+    r = float(rng.integers(8, 16)) / 100.0
+
+    npv = -I0 + (cf1 / (1 + r) ** 1) + (cf2 / (1 + r) ** 2) + (cf3 / (1 + r) ** 3)
+    npv_round = int(round(npv))  # làm tròn USD
+
+    decision = "ACCEPT" if npv_round > 0 else "REJECT"
+
+    params = {
+        "I0": I0,
+        "cf1": cf1,
+        "cf2": cf2,
+        "cf3": cf3,
+        "r": r,  # decimal, ví dụ 0.12
+    }
+    answers = {
+        "npv": npv_round,
+        "decision": decision,
+    }
+    return params, answers
+
+def irr_bisect(cashflows, low=-0.9, high=1.5, tol=1e-7, max_iter=200):
+    """
+    Tính IRR bằng bisection trên NPV(r)=0.
+    cashflows: list[float] với CF0 âm.
+    Trả về irr dạng decimal (vd 0.1543).
+    """
+    def npv(rate):
+        return sum(cf / ((1 + rate) ** t) for t, cf in enumerate(cashflows))
+
+    f_low = npv(low)
+    f_high = npv(high)
+
+    # Nếu không đổi dấu -> không đảm bảo có nghiệm trong khoảng
+    if f_low == 0:
+        return low
+    if f_high == 0:
+        return high
+    if f_low * f_high > 0:
+        # fallback: trả None để báo không tính được
+        return None
+
+    for _ in range(max_iter):
+        mid = (low + high) / 2
+        f_mid = npv(mid)
+        if abs(f_mid) < tol:
+            return mid
+        if f_low * f_mid < 0:
+            high = mid
+            f_high = f_mid
+        else:
+            low = mid
+            f_low = f_mid
+    return (low + high) / 2
+
+
+def compute_irr_decimal(cashflows):
+    """
+    Ưu tiên numpy_financial nếu có, nếu không thì bisection.
+    """
+    try:
+        import numpy_financial as npf
+        irr = npf.irr(cashflows)
+        if irr is None or (isinstance(irr, float) and (np.isnan(irr) or np.isinf(irr))):
+            return None
+        return float(irr)
+    except Exception:
+        return irr_bisect(cashflows)
+    
+def gen_case_I02(seed: int) -> tuple[dict, dict]:
+    rng = np.random.default_rng(int(seed))
+
+    I0 = int(rng.integers(80_000, 220_001) // 1000 * 1000)
+
+    # 4 năm để IRR "đẹp" hơn
+    cf1 = int(rng.integers(25_000, 90_001) // 1000 * 1000)
+    cf2 = int(rng.integers(25_000, 95_001) // 1000 * 1000)
+    cf3 = int(rng.integers(25_000, 100_001) // 1000 * 1000)
+    cf4 = int(rng.integers(25_000, 110_001) // 1000 * 1000)
+
+    # WACC 8% - 16%
+    wacc = float(rng.integers(8, 17)) / 100.0
+
+    cashflows = [-I0, cf1, cf2, cf3, cf4]
+    irr = compute_irr_decimal(cashflows)
+
+    # Nếu hiếm khi irr None do dữ liệu không đổi dấu trong khoảng -> regen nhẹ bằng seed+1
+    if irr is None:
+        rng = np.random.default_rng(int(seed) + 1)
+        I0 = int(rng.integers(80_000, 220_001) // 1000 * 1000)
+        cf1 = int(rng.integers(30_000, 90_001) // 1000 * 1000)
+        cf2 = int(rng.integers(30_000, 95_001) // 1000 * 1000)
+        cf3 = int(rng.integers(30_000, 100_001) // 1000 * 1000)
+        cf4 = int(rng.integers(30_000, 110_001) // 1000 * 1000)
+        wacc = float(rng.integers(8, 17)) / 100.0
+        cashflows = [-I0, cf1, cf2, cf3, cf4]
+        irr = compute_irr_decimal(cashflows)
+
+    irr_pct = float(irr) * 100.0
+    irr_pct_round = round(irr_pct, 2)  # làm tròn 2 chữ số thập phân
+
+    decision = "ACCEPT" if irr > wacc else "REJECT"
+
+    params = {
+        "I0": I0,
+        "cf1": cf1, "cf2": cf2, "cf3": cf3, "cf4": cf4,
+        "wacc": wacc,              # decimal
+        "cashflows": cashflows,    # lưu để debug/học
+    }
+    answers = {
+        "irr_pct": irr_pct_round,  # %
+        "decision": decision,
+    }
+    return params, answers
+
+#======= KẾT THÚC CÁC HÀM gen_case ======
+
 def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
     """Kiểm tra attempt đã nộp chưa."""
     if not supabase_client:
@@ -1564,6 +1692,250 @@ def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.rerun()
 
+def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code  = str(ex_code).strip().upper()
+    if ex_code != "I01":
+        return
+
+    # 1) Nếu attempt đã nộp -> khóa và hiện lại đề + đáp án
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.markdown("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- I0: **{params.get('I0',0):,} USD**")
+        st.write(f"- CF1: **{params.get('cf1',0):,} USD**, CF2: **{params.get('cf2',0):,} USD**, CF3: **{params.get('cf3',0):,} USD**")
+        r = float(params.get("r", 0))
+        st.write(f"- Discount rate r: **{r*100:.0f}%/năm**")
+
+        st.markdown("**Đáp án chuẩn (để đối chiếu học tập):**")
+        dec = ans.get("decision","-")
+        dec_vn = "Chấp nhận" if dec == "ACCEPT" else "Từ chối"
+        st.success(f"NPV = **{ans.get('npv','-'):,.0f} USD** | Quyết định: **{dec_vn}**")
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_I01(seed)
+
+    # 3) ghi thời điểm bắt đầu (để sau này bạn muốn tính time thì có sẵn)
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) UI đề bài
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài I01 — Thẩm định dự án FDI: NPV & Quyết định</div>
+  <div class="mission-text">
+    Tính <b>NPV (USD)</b> của dự án 3 năm và đưa ra quyết định <b>Chấp nhận/Từ chối</b>.
+    (Làm tròn NPV đến <b>USD</b>)
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 📌 Thông tin dự án")
+        st.write(f"I0 (t=0): **{params['I0']:,} USD**")
+        st.write(f"CF1 (t=1): **{params['cf1']:,} USD**")
+        st.write(f"CF2 (t=2): **{params['cf2']:,} USD**")
+        st.write(f"CF3 (t=3): **{params['cf3']:,} USD**")
+    with c2:
+        st.markdown("##### 📉 Chiết khấu")
+        st.write(f"r (USD discount rate): **{params['r']*100:.0f}%/năm**")
+        st.caption("Công thức: NPV = -I0 + Σ CFt/(1+r)^t")
+
+    st.markdown("---")
+
+    # 5) SV nhập đáp án
+    st.caption("✍️ Nhập kết quả")
+    a1, a2 = st.columns([1.3, 1.0])
+    with a1:
+        in_npv = st.number_input(
+            "NPV (USD, làm tròn)",
+            min_value=-10_000_000.0,
+            step=1.0,
+            format="%.0f",
+            key=f"i01_npv_{attempt_no}",
+        )
+    with a2:
+        in_decision = st.radio(
+            "Quyết định",
+            ["Chấp nhận", "Từ chối"],
+            horizontal=False,
+            key=f"i01_dec_{attempt_no}",
+        )
+
+    # 6) Chấm điểm + ghi DB
+    TOL = 5  # sai số ±5 USD
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_i01_{attempt_no}"):
+        npv_ok = abs(int(in_npv) - int(answers["npv"])) <= TOL
+
+        dec_code = "ACCEPT" if in_decision == "Chấp nhận" else "REJECT"
+        dec_ok = (dec_code == answers["decision"])
+
+        is_ok = bool(npv_ok and dec_ok)
+        score = 10 if is_ok else 0
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": "INVEST",
+            "exercise_code": ex_code,
+            "attempt_no": attempt_no,
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": is_ok,
+            "score": int(score),
+            "duration_sec": int(time.time() - st.session_state[start_key]),
+            "note": f"I01 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        # Feedback
+        if is_ok:
+            st.success("✅ CHÍNH XÁC! Bạn được **+10 điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+            dec_vn = "Chấp nhận" if answers["decision"] == "ACCEPT" else "Từ chối"
+            st.info(f"📌 Đáp án chuẩn: NPV = **{answers['npv']:,.0f} USD** | Quyết định: **{dec_vn}**")
+
+        st.rerun()
+
+def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code  = str(ex_code).strip().upper()
+    if ex_code != "I02":
+        return
+
+    # 1) Nếu attempt đã nộp -> khóa, hiện lại đề + đáp án
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.markdown("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- I0: **{params.get('I0',0):,} USD**")
+        st.write(f"- CF1: **{params.get('cf1',0):,}**, CF2: **{params.get('cf2',0):,}**, CF3: **{params.get('cf3',0):,}**, CF4: **{params.get('cf4',0):,}** (USD)")
+        wacc = float(params.get("wacc", 0))
+        st.write(f"- WACC: **{wacc*100:.0f}%/năm**")
+
+        dec = ans.get("decision","-")
+        dec_vn = "Chấp nhận" if dec == "ACCEPT" else "Từ chối"
+        st.success(f"IRR = **{ans.get('irr_pct','-')}%** | Quyết định: **{dec_vn}**")
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_I02(seed)
+
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 3) UI đề bài
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài I02 — IRR vs WACC (Tính IRR & Quyết định)</div>
+  <div class="mission-text">
+    Tính <b>IRR</b> của dự án và so sánh với <b>WACC</b> để quyết định <b>Chấp nhận/Từ chối</b>.
+    (Nhập IRR theo <b>%</b>, làm tròn <b>2 chữ số</b>)
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 📌 Dòng tiền dự án (USD)")
+        st.write(f"I0 (t=0): **-{params['I0']:,}**")
+        st.write(f"CF1 (t=1): **{params['cf1']:,}**")
+        st.write(f"CF2 (t=2): **{params['cf2']:,}**")
+        st.write(f"CF3 (t=3): **{params['cf3']:,}**")
+        st.write(f"CF4 (t=4): **{params['cf4']:,}**")
+    with c2:
+        st.markdown("##### 🧮 WACC")
+        st.write(f"WACC: **{params['wacc']*100:.0f}%/năm**")
+        st.caption("Quy tắc: Accept nếu IRR > WACC")
+
+    st.markdown("---")
+
+    # 4) SV nhập IRR và chọn quyết định
+    a1, a2 = st.columns([1.3, 1.0])
+    with a1:
+        in_irr = st.number_input(
+            "IRR (%)",
+            min_value=-90.0,
+            max_value=200.0,
+            value=0.0,
+            step=0.01,
+            format="%.2f",
+            key=f"i02_irr_{attempt_no}",
+        )
+    with a2:
+        in_decision = st.radio(
+            "Quyết định",
+            ["Chấp nhận", "Từ chối"],
+            key=f"i02_dec_{attempt_no}",
+        )
+
+    # 5) Nộp bài -> chấm
+    TOL_PCT = 0.10  # cho phép sai số ±0.10% do làm tròn/nhập
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_i02_{attempt_no}"):
+
+        irr_ok = abs(float(in_irr) - float(answers["irr_pct"])) <= TOL_PCT
+
+        dec_code = "ACCEPT" if in_decision == "Chấp nhận" else "REJECT"
+        dec_ok = (dec_code == answers["decision"])
+
+        is_ok = bool(irr_ok and dec_ok)
+        score = 10 if is_ok else 0
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": "INVEST",
+            "exercise_code": ex_code,
+            "attempt_no": attempt_no,
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": is_ok,
+            "score": int(score),
+            "duration_sec": int(time.time() - st.session_state[start_key]),
+            "note": f"I02 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        if is_ok:
+            st.success("✅ CHÍNH XÁC! Bạn được **+10 điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+            dec_vn = "Chấp nhận" if answers["decision"] == "ACCEPT" else "Từ chối"
+            st.info(f"📌 Đáp án chuẩn: IRR = **{answers['irr_pct']}%** | Quyết định: **{dec_vn}**")
+
+        st.rerun()
+        
+#====== KẾT THÚC ĐỊNH NGHĨA HÀM RENDER CHO CÁC BÀI TẬP ======#
 
 # =========================================================
 # EXERCISE ROUTER MAP: (ROOM, EX_CODE) -> render_function
@@ -1577,7 +1949,8 @@ EX_RENDERERS = {
     ("RISK", "R02"): render_exercise_R02,
     ("TRADE", "T01"): render_exercise_T01,
     ("TRADE", "T02"): render_exercise_T02,
-    # ("INVEST", "I01"): render_exercise_I01,
+    ("INVEST", "I01"): render_exercise_I01,
+    ("INVEST", "I02"): render_exercise_I02,
     # ("MACRO", "M01"): render_exercise_M01,
 }
 

@@ -3287,9 +3287,7 @@ def room_6_leaderboard():
             st.warning("Chưa có dữ liệu xếp hạng. Lớp chưa nộp bài nào.")
             return
 
-        df = pd.DataFrame(data)
-        st.caption(f"DEBUG: rows={len(df)}")
-
+        df = pd.DataFrame(data)    
 
         # Chuẩn hóa vài cột phổ biến (view/fallback có thể khác nhau)
         # ưu tiên các cột: mssv, hoten, total_score, total_correct, exercises_done, last_submit
@@ -3537,5 +3535,6 @@ if handler is None:
     st.rerun()
 
 handler()
+
 
 

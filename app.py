@@ -9,6 +9,7 @@ from supabase import create_client, Client
 import hashlib
 import time
 import random
+import math
 
 
 
@@ -328,6 +329,54 @@ def gen_case_D02(seed: int) -> tuple[dict, dict]:
 
     return params, answers
 
+def gen_case_R01(seed: int) -> tuple[dict, dict]:
+    """
+    R01: Tính tỷ giá kỳ hạn theo IRP + chi phí hedge Forward cho khoản nợ USD.
+    Output:
+      - params: dữ liệu đề bài
+      - answers: đáp án chuẩn
+    """
+    rng = random.Random(int(seed))
+
+    usd_amount = rng.randrange(200_000, 2_000_001, 50_000)     # USD nợ
+    days = rng.choice([30, 60, 90, 180])                       # kỳ hạn (ngày)
+
+    # Spot USD/VND (BID/ASK) - step 10 VND
+    spot_bid = rng.randrange(23200, 25801, 10)
+    spread = rng.randrange(20, 71, 5)
+    spot_ask = spot_bid + spread
+
+    # Lãi suất năm (decimal)
+    i_vnd = rng.choice([0.045, 0.050, 0.055, 0.060, 0.065, 0.070, 0.075, 0.080])
+    i_usd = rng.choice([0.020, 0.025, 0.030, 0.035, 0.040, 0.045, 0.050, 0.055])
+
+    t = days / 360.0
+    factor = (1.0 + i_vnd * t) / (1.0 + i_usd * t)
+
+    fwd_bid = spot_bid * factor
+    fwd_ask = spot_ask * factor
+
+    fwd_bid_i = int(round(fwd_bid))   # làm tròn đến VND
+    fwd_ask_i = int(round(fwd_ask))
+
+    # Hedge khoản nợ USD => DN cần MUA USD tương lai => dùng Forward ASK
+    hedged_cost_vnd = int(round(usd_amount * fwd_ask_i))
+
+    params = {
+        "usd_amount": usd_amount,
+        "days": days,
+        "spot_bid": spot_bid,
+        "spot_ask": spot_ask,
+        "i_vnd": i_vnd,   # decimal
+        "i_usd": i_usd,   # decimal
+    }
+
+    answers = {
+        "fwd_bid": fwd_bid_i,
+        "fwd_ask": fwd_ask_i,
+        "hedged_cost_vnd": hedged_cost_vnd,
+    }
+    return params, answers
 
 def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
     """Kiểm tra attempt đã nộp chưa."""
@@ -404,8 +453,8 @@ EXERCISE_CATALOG = {
 
     # PHÒNG 2: RISK MANAGEMENT (loại R2-03 nâng cao)
     "RISK": [
-        {"code": "R01", "title": "Forward Rate hợp lý theo IRP (tính F từ S, i_dom, i_for, số ngày)"},
-        {"code": "R02", "title": "Chọn công cụ phòng vệ tối ưu (Forward vs Option vs No Hedge)"},
+        {"code": "R01", "title": "Tính tỷ giá kỳ hạn (IRP) & chi phí Forward cho khoản nợ USD"},
+        {"code": "R02", "title": "Forward vs Option (Premium & Break-even)"},
     ],
 
     # PHÒNG 3: TRADE FINANCE
@@ -705,6 +754,123 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.rerun()
 
+def render_exercise_R01(mssv: str, ex_code: str, attempt_no: int):
+    room_key = "RISK"
+    if ex_code != "R01":
+        return
+
+    # 1) nếu attempt đã nộp -> khóa, show lại đề + đáp án từ DB
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.write("**Đề bài bạn đã nhận (từ DB):**")
+        st.write(f"- Khoản nợ: **{params.get('usd_amount','-'):,.0f} USD**, đáo hạn **{params.get('days','-')} ngày**")
+        st.write(f"- Spot USD/VND: **{params.get('spot_bid','-'):,.0f} / {params.get('spot_ask','-'):,.0f}**")
+        st.write(f"- i(VND): **{float(params.get('i_vnd',0))*100:.2f}%** | i(USD): **{float(params.get('i_usd',0))*100:.2f}%**")
+
+        st.markdown("**Đáp án chuẩn (để đối chiếu):**")
+        st.success(
+            f"Forward USD/VND = **{ans.get('fwd_bid','-'):,.0f} / {ans.get('fwd_ask','-'):,.0f}**  |  "
+            f"Chi phí hedge (Forward ASK) = **{ans.get('hedged_cost_vnd','-'):,.0f} VND**"
+        )
+        return
+
+    # 2) sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_R01(seed)
+
+    # 3) ghi nhận thời điểm bắt đầu (optional)
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) hiển thị đề
+    st.markdown(
+        f"""
+<div class="role-card">
+  <div class="role-title">🧾 Bài R01 — Tỷ giá kỳ hạn (IRP) & Hedge Forward cho khoản nợ USD</div>
+  <div class="mission-text">
+    Doanh nghiệp có khoản nợ <b>{params['usd_amount']:,.0f} USD</b> đáo hạn sau <b>{params['days']} ngày</b>.
+    Dựa trên Spot và lãi suất, hãy tính <b>Forward USD/VND (ASK)</b> và <b>chi phí hedge (VND)</b> nếu dùng Forward.
+    <br>(Làm tròn đến <b>VND</b>)
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 🌐 Spot USD/VND")
+        st.write(f"BID: **{params['spot_bid']:,.0f}**")
+        st.write(f"ASK: **{params['spot_ask']:,.0f}**")
+    with c2:
+        st.markdown("##### 📈 Lãi suất năm (Act/360)")
+        st.write(f"i(VND): **{params['i_vnd']*100:.2f}%**")
+        st.write(f"i(USD): **{params['i_usd']*100:.2f}%**")
+
+    st.markdown("---")
+    st.caption("✍️ Nhập kết quả (làm tròn 0 chữ số thập phân)")
+
+    a1, a2 = st.columns(2)
+    with a1:
+        in_fwd_ask = st.number_input(
+            "Forward USD/VND (ASK)",
+            min_value=0.0, step=1.0, format="%.0f",
+            key=f"r01_in_fwdask_{attempt_no}"
+        )
+    with a2:
+        in_cost = st.number_input(
+            "Chi phí hedge (VND) = USD nợ × Forward ASK",
+            min_value=0.0, step=1000.0, format="%.0f",
+            key=f"r01_in_cost_{attempt_no}"
+        )
+
+    # 5) submit + chấm
+    TOL_FWD = 5  # sai số ±5 VND do làm tròn
+    tol_cost = int(params["usd_amount"] * TOL_FWD)  # sai số cost tương ứng
+
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_r01_{attempt_no}"):
+        ok_fwd = abs(int(in_fwd_ask) - int(answers["fwd_ask"])) <= TOL_FWD
+        ok_cost = abs(int(in_cost) - int(answers["hedged_cost_vnd"])) <= tol_cost
+
+        is_ok = bool(ok_fwd and ok_cost)
+        score = 10 if is_ok else 0
+        duration_sec = int(time.time() - st.session_state[start_key])
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": room_key,
+            "exercise_code": ex_code,
+            "attempt_no": int(attempt_no),
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": is_ok,
+            "score": int(score),
+            "duration_sec": int(duration_sec),
+            "note": f"R01 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. (0 điểm)")
+
+        st.info(
+            f"📌 Đáp án chuẩn: Forward USD/VND = **{answers['fwd_bid']:,.0f} / {answers['fwd_ask']:,.0f}**  |  "
+            f"Chi phí hedge = **{answers['hedged_cost_vnd']:,.0f} VND**"
+        )
+        st.rerun()
 
 # =========================================================
 # EXERCISE ROUTER MAP: (ROOM, EX_CODE) -> render_function
@@ -713,9 +879,8 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
 EX_RENDERERS = {
     ("DEALING", "D01"): render_exercise_D01,
-    ("DEALING", "D02"): render_exercise_D02,
-    # Ví dụ sau này:
-    # ("RISK", "R01"): render_exercise_R01,
+    ("DEALING", "D02"): render_exercise_D02,    
+    ("RISK", "R01"): render_exercise_R01,
     # ("TRADE", "T01"): render_exercise_T01,
     # ("INVEST", "I01"): render_exercise_I01,
     # ("MACRO", "M01"): render_exercise_M01,
@@ -3341,15 +3506,11 @@ def room_6_leaderboard():
 
 
         # Bộ lọc/search
-        c1, c2, c3 = st.columns([2, 1, 1])
+        c1, c2 = st.columns([2, 1])
         with c1:
             kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key=f"lb_search_{mssv}")
         with c2:
             top_n = st.selectbox("Hiển thị Top", [20, 50, 100, 200], index=1, key=f"lb_top_n_{mssv}")
-        with c3:
-            if st.button("🧹 Xóa lọc", use_container_width=True, key=f"lb_clear_{mssv}"):
-                st.session_state[f"lb_search_{mssv}"] = ""
-                st.rerun()
 
         show = df.copy()
 

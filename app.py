@@ -3358,7 +3358,22 @@ def room_6_leaderboard():
             "exercises_done":"Số mã bài",
         })
 
-        st.dataframe(show2, use_container_width=True, hide_index=True)
+        st.dataframe(show2, use_container_width=True, hide_index=True)        
+
+        # Hiển thị rank cá nhân
+        my_row = df[df["mssv"] == mssv]
+        st.markdown("---")
+        if not my_row.empty:
+            r = int(my_row.iloc[0]["Rank"])
+            sc = int(my_row.iloc[0]["total_score"])
+            cr = int(my_row.iloc[0]["total_correct"])
+            exd = int(my_row.iloc[0]["exercises_done"])
+            if my_name:
+                st.success(f"📌 Vị trí của **{my_name} ({mssv})**: **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
+            else:
+                st.success(f"📌 Vị trí của bạn ({mssv}): **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
+        else:
+            st.info("Bạn chưa có dữ liệu xếp hạng (chưa nộp bài hoặc chưa đồng bộ).")
 
         st.markdown("---")
         st.subheader("🎁 Quay thưởng ngẫu nhiên (Lucky Draw)")
@@ -3425,21 +3440,56 @@ def room_6_leaderboard():
         else:
             st.caption("Chưa có kết quả quay.")
 
+        # Sau khi có winners (list dict) => hiển thị podium
+        if winners:
+            top3 = winners[:3] + [{"hoten":"", "mssv":"", "total_score":""}] * (3 - len(winners))
 
-        # Hiển thị rank cá nhân
-        my_row = df[df["mssv"] == mssv]
-        st.markdown("---")
-        if not my_row.empty:
-            r = int(my_row.iloc[0]["Rank"])
-            sc = int(my_row.iloc[0]["total_score"])
-            cr = int(my_row.iloc[0]["total_correct"])
-            exd = int(my_row.iloc[0]["exercises_done"])
-            if my_name:
-                st.success(f"📌 Vị trí của **{my_name} ({mssv})**: **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
-            else:
-                st.success(f"📌 Vị trí của bạn ({mssv}): **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
-        else:
-            st.info("Bạn chưa có dữ liệu xếp hạng (chưa nộp bài hoặc chưa đồng bộ).")
+            podium_html = f"""
+            <style>
+            .podium-wrap {{
+            display:flex; gap:18px; justify-content:center; align-items:flex-end;
+            margin: 10px 0 6px 0;
+            }}
+            .podium-col {{
+            width: 180px; border-radius: 16px; padding: 14px 12px;
+            background: #1f2937; border:1px solid #374151; text-align:center;
+            box-shadow: 0 10px 20px rgba(0,0,0,.25);
+            }}
+            .podium-step {{
+            display:flex; align-items:center; justify-content:center;
+            border-radius: 14px; margin-top:10px; font-size: 34px; font-weight: 900;
+            color:#111827; background:#e5e7eb;
+            }}
+            .h1 {{ height: 180px; background:#fbbf24; }}   /* Gold */
+            .h2 {{ height: 140px; background:#9ca3af; }}   /* Silver */
+            .h3 {{ height: 120px; background:#d97706; }}   /* Bronze */
+            .name {{ font-weight: 800; font-size: 18px; color: #fff; }}
+            .meta {{ font-size: 13px; color:#cbd5e1; }}
+            </style>
+
+            <div class="podium-wrap">
+            <div class="podium-col">
+                <div class="name">🥈 {top3[1]["hoten"]}</div>
+                <div class="meta">{top3[1]["mssv"]}</div>
+                <div class="podium-step h2">2</div>
+            </div>
+
+            <div class="podium-col">
+                <div class="name">🥇 {top3[0]["hoten"]}</div>
+                <div class="meta">{top3[0]["mssv"]}</div>
+                <div class="podium-step h1">1</div>
+            </div>
+
+            <div class="podium-col">
+                <div class="name">🥉 {top3[2]["hoten"]}</div>
+                <div class="meta">{top3[2]["mssv"]}</div>
+                <div class="podium-step h3">3</div>
+            </div>
+            </div>
+            """
+            st.markdown("### 🏆 Lễ trao giải Top 3")
+            st.markdown(podium_html, unsafe_allow_html=True)
+
 
     footer()
 

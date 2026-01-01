@@ -2733,7 +2733,8 @@ def room_6_leaderboard():
             st.stop()
 
         # 2) Sinh đề theo seed ổn định
-        seed = stable_seed(mssv, ex_code, attempt_no)
+        # Clamp về miền BIGINT signed (0 .. 2^63-1)
+        seed_db = int(seed) & ((1 << 63) - 1)
         params, answers = gen_case_D01(seed)
 
         # 3) Ghi nhận thời điểm bắt đầu (để sau này nếu bạn muốn tính thời gian thì có sẵn)
@@ -3036,5 +3037,6 @@ elif room == "MACRO":
     room_5_macro()
 elif room == "LEADERBOARD":
     room_6_leaderboard()
+
 
 

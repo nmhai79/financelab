@@ -3338,8 +3338,14 @@ def room_6_leaderboard():
             kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key=f"lb_search_{mssv}")
         with c2:
             top_n = st.selectbox("Hiển thị Top", [20, 50, 100, 200], index=1, key=f"lb_top_n_{mssv}")
+        with c3:
+            if st.button("🧹 Xóa lọc", use_container_width=True, key=f"lb_clear_{mssv}"):
+                st.session_state[f"lb_search_{mssv}"] = ""
+                st.rerun()
 
         show = df.copy()
+
+        # nếu có nhập keyword thì lọc
         if kw.strip():
             k = kw.strip().lower()
             show = show[
@@ -3347,7 +3353,13 @@ def room_6_leaderboard():
                 | show["hoten"].astype(str).str.lower().str.contains(k)
             ]
 
+            # ✅ nếu lọc ra rỗng -> quay về hiển thị toàn lớp (để SV vẫn thấy BXH)
+            if show.empty:
+                st.warning("Không có kết quả theo bộ lọc hiện tại. Hiển thị lại toàn lớp.")
+                show = df.copy()
+
         show = show.head(int(top_n))
+
 
         # Bảng hiển thị
         show2 = show[["Rank","hoten","mssv","total_score","total_correct","exercises_done"]].rename(columns={

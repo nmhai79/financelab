@@ -167,9 +167,11 @@ def consume_quota(student_id):
 # LEADERBOARD PRACTICE HELPERS
 # =========================
 def stable_seed(*parts) -> int:
-    """Seed ổn định theo MSSV + bài + attempt để đề không đổi khi rerun."""
+    """Seed ổn định và luôn nằm trong miền BIGINT signed của Postgres."""
     s = "|".join(str(p) for p in parts)
-    return int(hashlib.sha256(s.encode("utf-8")).hexdigest()[:16], 16)
+    h = hashlib.sha256(s.encode("utf-8")).hexdigest()
+    # lấy 16 hex (64-bit) rồi ép về miền signed 63-bit để không overflow bigint
+    return int(h[:16], 16) & ((1 << 63) - 1)
 
 def gen_case_D01(seed: int) -> tuple[dict, dict]:
     """
@@ -3034,4 +3036,5 @@ elif room == "MACRO":
     room_5_macro()
 elif room == "LEADERBOARD":
     room_6_leaderboard()
+
 

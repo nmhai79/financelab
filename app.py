@@ -2546,6 +2546,149 @@ def compute_class_leaderboard_fallback(limit: int = 200):
         return []
 
 
+def render_practice_router():
+    st.markdown("### 🧩 Khu vực làm bài (Workspace)")
+
+    mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
+    room_key = st.session_state.get("ACTIVE_ROOM", "DEALING")
+    ex_code = st.session_state.get("ACTIVE_EX_CODE", "D01")
+    attempt_no = int(st.session_state.get("ACTIVE_ATTEMPT", 1))
+
+    ROUTER = {
+        ("DEALING", "D01"): render_exercise_D01,
+        # ("DEALING", "D02"): render_exercise_D02,
+        # ("RISK", "R01"): render_exercise_R01,
+        # ...
+    }
+
+    fn = ROUTER.get((room_key, ex_code))
+    if not fn:
+        st.info("👉 Bài này chưa được triển khai. Bạn chọn **D01** để demo.")
+        return
+
+    fn(mssv=mssv, ex_code=ex_code, attempt_no=attempt_no)
+
+# BÀI D01: XỬ LÝ GIAO DỊCH NGOẠI HỐI
+def render_exercise_D01(mssv: str, ex_code: str, attempt_no: int):
+    # Chỉ demo D01
+    if ex_code != "D01":
+        st.info("👉 Demo hiện tại chỉ kích hoạt cho **D01**.")
+        return
+
+    # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        st.write("**Đề bài bạn đã nhận (từ DB):**")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("##### 🇺🇸 USD/VND")
+            st.write(f"BID: **{params.get('usd_bid','-'):,.0f}**")
+            st.write(f"ASK: **{params.get('usd_ask','-'):,.0f}**")
+        with c2:
+            st.markdown("##### 🇪🇺 EUR/USD")
+            st.write(f"BID: **{float(params.get('eur_bid',0.0)):.4f}**" if params.get("eur_bid") else "BID: **-**")
+            st.write(f"ASK: **{float(params.get('eur_ask',0.0)):.4f}**" if params.get("eur_ask") else "ASK: **-**")
+
+        st.markdown("**Đáp án chuẩn (để bạn đối chiếu học tập):**")
+        st.success(
+            f"EUR/VND = **{ans.get('cross_bid','-'):,.0f} - {ans.get('cross_ask','-'):,.0f}** | Spread = **{ans.get('spread','-'):,.0f}**"
+        )
+        return  # ✅ thay st.stop()
+
+    # 2) Seed ổn định + clamp để ghi BIGINT an toàn
+    seed_raw = stable_seed(mssv, ex_code, attempt_no)
+    seed = int(seed_raw) & ((1 << 63) - 1)   # ✅ chống lỗi bigint
+    params, answers = gen_case_D01(seed)
+
+    # 3) Ghi nhận thời điểm bắt đầu
+    start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+    if start_key not in st.session_state:
+        st.session_state[start_key] = time.time()
+
+    # 4) Hiển thị đề
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài D01 — Niêm yết tỷ giá chéo EUR/VND (Bid–Ask–Spread)</div>
+  <div class="mission-text">
+    Dựa trên báo giá thị trường dưới đây, hãy tính <b>EUR/VND Bid</b>, <b>EUR/VND Ask</b> và <b>Spread</b>.
+    (Làm tròn đến <b>đơn vị VND</b>)
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("##### 🇺🇸 Thị trường 1: USD/VND")
+        st.write(f"BID (NH mua USD): **{params['usd_bid']:,.0f}**")
+        st.write(f"ASK (NH bán USD): **{params['usd_ask']:,.0f}**")
+    with c2:
+        st.markdown("##### 🇪🇺 Thị trường 2: EUR/USD")
+        st.write(f"BID (NH mua EUR): **{params['eur_bid']:.4f}**")
+        st.write(f"ASK (NH bán EUR): **{params['eur_ask']:.4f}**")
+
+    st.markdown("---")
+    st.caption("✍️ Nhập kết quả (làm tròn 0 chữ số thập phân – VND/EUR)")
+
+    a1, a2, a3 = st.columns(3)
+    with a1:
+        in_bid = st.number_input("EUR/VND BID", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_bid_{attempt_no}")
+    with a2:
+        in_ask = st.number_input("EUR/VND ASK", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_ask_{attempt_no}")
+    with a3:
+        in_spread = st.number_input("SPREAD", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_spread_{attempt_no}")
+
+    # 5) Nộp bài
+    TOL = 2
+
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_d01_{attempt_no}"):
+        is_ok = (
+            abs(int(in_bid) - answers["cross_bid"]) <= TOL
+            and abs(int(in_ask) - answers["cross_ask"]) <= TOL
+            and abs(int(in_spread) - answers["spread"]) <= TOL
+        )
+        score = 10 if is_ok else 0
+        duration_sec = int(time.time() - st.session_state[start_key])
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": "DEALING",
+            "exercise_code": ex_code,
+            "attempt_no": attempt_no,
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": bool(is_ok),
+            "score": int(score),
+            "duration_sec": int(duration_sec),
+            "note": f"D01 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            # ✅ không st.stop() để không chặn tab khác
+            st.error("Không ghi được bài nộp. Vui lòng thử lại.")
+            return
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+
+        st.info(
+            f"📌 Đáp án chuẩn: EUR/VND = **{answers['cross_bid']:,.0f} - {answers['cross_ask']:,.0f}** | Spread = **{answers['spread']:,.0f}**"
+        )
+        st.rerun()
+
+
 # ======= PHÒNG 6 BẢNG VÀNG THÀNH TÍCH ========
 def room_6_leaderboard():
 
@@ -2669,7 +2812,8 @@ def room_6_leaderboard():
                 key="sel_ex_pick",
             )
             # Parse code
-            picked_code = ex_pick.split("—")[0].strip()
+            picked_code = ex_pick.split("—")[0].strip() if "—" in ex_pick else ex_pick.split("-")[0].strip()
+
             st.session_state["ACTIVE_EX_CODE"] = picked_code
 
         # --- B) Chọn lần làm (Attempt 1/2/3) ---
@@ -2697,136 +2841,8 @@ def room_6_leaderboard():
             f"👤 SV: **{mssv}**  |  🏢 Phòng: **{st.session_state['ACTIVE_ROOM']}**  |  📌 Bài: **{st.session_state['ACTIVE_EX_CODE']}**  |  🔁 Lần: **{st.session_state['ACTIVE_ATTEMPT']}**"
         )
 
-        st.markdown("### 🧩 Khu vực làm bài (Workspace)")
+        render_practice_router()
 
-        mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
-        room_key = st.session_state.get("ACTIVE_ROOM", "DEALING")
-        ex_code = st.session_state.get("ACTIVE_EX_CODE", "D01")
-        attempt_no = int(st.session_state.get("ACTIVE_ATTEMPT", 1))
-
-        # Chỉ demo D01 trước
-        if not (room_key == "DEALING" and ex_code == "D01"):
-            st.info("👉 Demo hiện tại chỉ kích hoạt cho **D01 (Dealing Room)**. Bạn chọn D01 để thử.")
-            st.stop()
-
-        # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại thông tin
-        existing = fetch_attempt(mssv, ex_code, attempt_no)
-        if existing:
-            st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
-            params = existing.get("params_json", {}) or {}
-            ans = existing.get("answer_json", {}) or {}
-
-            st.write("**Đề bài bạn đã nhận (từ DB):**")
-            c1, c2 = st.columns(2)
-            with c1:
-                st.markdown("##### 🇺🇸 USD/VND")
-                st.write(f"BID: **{params.get('usd_bid','-'):,.0f}**")
-                st.write(f"ASK: **{params.get('usd_ask','-'):,.0f}**")
-            with c2:
-                st.markdown("##### 🇪🇺 EUR/USD")
-                st.write(f"BID: **{params.get('eur_bid','-')}**")
-                st.write(f"ASK: **{params.get('eur_ask','-')}**")
-
-            st.markdown("**Đáp án chuẩn (để bạn đối chiếu học tập):**")
-            st.success(
-                f"EUR/VND = **{ans.get('cross_bid','-'):,.0f} - {ans.get('cross_ask','-'):,.0f}** | Spread = **{ans.get('spread','-'):,.0f}**"
-            )
-            st.stop()
-
-        # 2) Sinh đề theo seed ổn định
-        seed = stable_seed(mssv, ex_code, attempt_no)        
-        params, answers = gen_case_D01(seed)
-
-        # 3) Ghi nhận thời điểm bắt đầu (để sau này nếu bạn muốn tính thời gian thì có sẵn)
-        start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
-        if start_key not in st.session_state:
-            st.session_state[start_key] = time.time()
-
-        # 4) Hiển thị đề bài
-        st.markdown(
-            f"""
-        <div class="role-card">
-        <div class="role-title">📝 Bài D01 — Niêm yết tỷ giá chéo EUR/VND (Bid–Ask–Spread)</div>
-        <div class="mission-text">
-            Dựa trên báo giá thị trường dưới đây, hãy tính <b>EUR/VND Bid</b>, <b>EUR/VND Ask</b> và <b>Spread</b>.
-            (Làm tròn đến <b>đơn vị VND</b>)
-        </div>
-        </div>
-        """,
-            unsafe_allow_html=True,
-        )
-
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("##### 🇺🇸 Thị trường 1: USD/VND")
-            st.write(f"BID (NH mua USD): **{params['usd_bid']:,.0f}**")
-            st.write(f"ASK (NH bán USD): **{params['usd_ask']:,.0f}**")
-        with c2:
-            st.markdown("##### 🇪🇺 Thị trường 2: EUR/USD")
-            st.write(f"BID (NH mua EUR): **{params['eur_bid']:.4f}**")
-            st.write(f"ASK (NH bán EUR): **{params['eur_ask']:.4f}**")
-
-        st.markdown("---")
-
-        # 5) SV nhập đáp án
-        st.caption("✍️ Nhập kết quả (làm tròn 0 chữ số thập phân – VND/EUR)")
-
-        a1, a2, a3 = st.columns(3)
-        with a1:
-            in_bid = st.number_input("EUR/VND BID", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_bid_{attempt_no}")
-        with a2:
-            in_ask = st.number_input("EUR/VND ASK", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_ask_{attempt_no}")
-        with a3:
-            in_spread = st.number_input("SPREAD", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_spread_{attempt_no}")
-
-        # 6) Nộp bài -> chấm
-        TOL = 2  # cho phép lệch ±2 VND do làm tròn/nhập nhanh
-
-        if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_d01_{attempt_no}"):
-            # Chấm đúng/sai
-            is_ok = (
-                abs(int(in_bid) - answers["cross_bid"]) <= TOL
-                and abs(int(in_ask) - answers["cross_ask"]) <= TOL
-                and abs(int(in_spread) - answers["spread"]) <= TOL
-            )
-
-            score = 10 if is_ok else 0         
-
-            duration_sec = int(time.time() - st.session_state[start_key])
-
-            payload = {
-                "mssv": mssv,
-                "hoten": None,           # sau này bạn map từ Excel mới thì fill vào
-                "lop": None,             # optional
-                "room": "DEALING",
-                "exercise_code": ex_code,
-                "attempt_no": attempt_no,
-                "seed": int(seed),
-                "params_json": params,
-                "answer_json": answers,
-                "is_correct": bool(is_ok),
-                "score": int(score),
-                "duration_sec": int(duration_sec),                
-                "note": f"D01 attempt {attempt_no}",
-            }
-
-            ok = insert_attempt(payload)
-            if not ok:
-                st.stop()
-
-            if is_ok:
-                st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
-                reward_ai_calls_by_decreasing_usage(mssv, bonus_calls=2)
-            else:
-                st.error(f"❌ CHƯA ĐÚNG. Bạn được **{score} điểm** (0 điểm).")
-
-            st.info(
-                f"📌 Đáp án chuẩn: EUR/VND = **{answers['cross_bid']:,.0f} - {answers['cross_ask']:,.0f}** | Spread = **{answers['spread']:,.0f}**"
-            )
-
-            st.rerun()
-
-        #st.markdown("👉 (Sắp triển khai) Danh sách bài tập theo từng phòng nghiệp vụ.")
 
     # =========================================================
     # TAB 2: MY STATS
@@ -2895,11 +2911,13 @@ Hiển thị:
             "last_submit": "Nộp gần nhất",
         })
         show_ex["Đúng (1/0)"] = show_ex["Đúng (1/0)"].astype(int)
-        # Format datetime đẹp hơn (giờ VN)
-        for col in ["Nộp gần nhất", "Thời điểm"]:
-            if col in show_ex.columns:
-                show_ex[col] = pd.to_datetime(show_ex[col], utc=True).dt.tz_convert("Asia/Ho_Chi_Minh").dt.strftime("%Y-%m-%d %H:%M")
-
+        # Format datetime đẹp hơn (giờ VN) - chỉ cột Nộp gần nhất
+        if "Nộp gần nhất" in show_ex.columns:
+            show_ex["Nộp gần nhất"] = (
+                pd.to_datetime(show_ex["Nộp gần nhất"], errors="coerce", utc=True)
+                .dt.tz_convert("Asia/Ho_Chi_Minh")
+                .dt.strftime("%Y-%m-%d %H:%M")
+            )
 
         st.dataframe(show_ex, use_container_width=True, hide_index=True)
 
@@ -2916,9 +2934,12 @@ Hiển thị:
             "is_correct":"Đúng?",
         })
         recent["Đúng?"] = recent["Đúng?"].astype(bool).map({True:"✅", False:"❌"})
-        recent["Thời điểm"] = pd.to_datetime(recent["Thời điểm"], utc=True)\
-            .dt.tz_convert("Asia/Ho_Chi_Minh")\
-            .dt.strftime("%Y-%m-%d %H:%M")
+        recent["Thời điểm"] = (
+            pd.to_datetime(recent["Thời điểm"], errors="coerce", utc=True)
+            .dt.tz_convert("Asia/Ho_Chi_Minh")
+            .dt.strftime("%Y-%m-%d %H:%M")  
+        )
+
 
         st.dataframe(recent, use_container_width=True, hide_index=True)
 

@@ -8,6 +8,8 @@ import google.generativeai as genai
 from supabase import create_client, Client
 import hashlib
 import time
+import random
+
 
 
 MAX_AI_QUOTA = 10
@@ -3262,8 +3264,7 @@ def room_6_leaderboard():
 
         mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
         my_name = get_student_name(mssv)
-
-        st.markdown("### 🏫 Bảng xếp hạng lớp (Class Leaderboard)")
+        
         st.caption("Xếp hạng dựa trên **tổng điểm best-of-3** của mỗi mã bài.")
 
         # 1) Ưu tiên view
@@ -3358,6 +3359,72 @@ def room_6_leaderboard():
         })
 
         st.dataframe(show2, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.subheader("🎁 Quay thưởng ngẫu nhiên (Lucky Draw)")
+
+        cA, cB, cC = st.columns([1.2, 1.2, 2.0])
+        with cA:
+            draw_pool = st.number_input("Lấy từ Top", min_value=5, max_value=200, value=20, step=5, key="draw_pool")
+        with cB:
+            draw_k = st.number_input("Số bạn trúng", min_value=1, max_value=20, value=5, step=1, key="draw_k")
+
+        # Pool: lấy từ show (đã lọc/search) hoặc df gốc?
+        # Khuyến nghị: dùng df gốc để không bị ảnh hưởng bởi ô search
+        pool_df = df.head(int(draw_pool)).copy()
+
+        # Nếu bạn muốn chỉ quay trong những bạn "đồng hạng điểm cao nhất"
+        # (ví dụ có 20 bạn cùng điểm cao nhất), bật chế độ này:
+        same_top_score_only = st.checkbox("Chỉ quay trong nhóm đồng điểm cao nhất", value=False, key="draw_same_score")
+
+        if same_top_score_only and not pool_df.empty:
+            top_score = int(pool_df.iloc[0]["total_score"])
+            pool_df = df[df["total_score"] == top_score].copy()
+
+        # Chuẩn hoá tên hiển thị
+        pool_df["hoten"] = pool_df["hoten"].fillna("").astype(str)
+        pool_df["mssv"] = pool_df["mssv"].fillna("").astype(str)
+
+        # Tạo list ứng viên
+        candidates = []
+        for _, r in pool_df.iterrows():
+            name = r["hoten"].strip() if r["hoten"].strip() else "(Chưa có tên)"
+            candidates.append({"hoten": name, "mssv": r["mssv"].strip(), "total_score": int(r["total_score"])})
+
+        # Nút quay + reset
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🎲 QUAY NGAY", type="primary", use_container_width=True, key="btn_draw_now"):
+                if len(candidates) < int(draw_k):
+                    st.error(f"Không đủ ứng viên để chọn {draw_k} bạn. Hiện có {len(candidates)}.")
+                else:
+                    # Seed theo thời gian để mỗi lần quay khác nhau
+                    random.seed()
+
+                    winners = random.sample(candidates, k=int(draw_k))
+                    st.session_state["DRAW_WINNERS"] = winners
+
+        with col2:
+            if st.button("🧹 Xóa kết quả quay", use_container_width=True, key="btn_draw_clear"):
+                st.session_state.pop("DRAW_WINNERS", None)
+                st.rerun()
+
+        # Hiển thị kết quả
+        winners = st.session_state.get("DRAW_WINNERS", [])
+        if winners:
+            st.success("🏆 Kết quả quay thưởng:")
+            show_w = pd.DataFrame(winners)
+            show_w = show_w.rename(columns={
+                "hoten": "Họ tên",
+                "mssv": "MSSV",
+                "total_score": "Tổng điểm",
+            })
+            # thêm số thứ tự
+            show_w.insert(0, "STT", range(1, len(show_w) + 1))
+            st.dataframe(show_w, use_container_width=True, hide_index=True)
+        else:
+            st.caption("Chưa có kết quả quay.")
+
 
         # Hiển thị rank cá nhân
         my_row = df[df["mssv"] == mssv]

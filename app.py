@@ -2972,12 +2972,12 @@ def render_practice_router():
     # Guard: chưa login
     if not mssv:
         st.warning("Bạn chưa đăng nhập MSSV/PIN.")
-        st.stop()
+        return
 
     fn = EX_RENDERERS.get((room_key, ex_code))
     if fn is None:
         st.info(f"👉 Bài **{ex_code}** của phòng **{room_key}** chưa được triển khai.")
-        st.stop()
+        return
 
     # gọi renderer
     fn(mssv, room_key, ex_code, attempt_no)

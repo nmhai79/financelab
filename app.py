@@ -2499,7 +2499,7 @@ def fetch_class_leaderboard_from_view(limit: int = 200):
     try:
         res = (
             supabase_client.from_("lab_leaderboard")
-            .select("*")
+            .select("mssv,hoten,lop,total_score,num_solved_ex,num_exercises,last_submit")
             .order("total_score", desc=True)
             .limit(limit)
             .execute()
@@ -3042,20 +3042,16 @@ def room_6_leaderboard():
         if "total_score" not in df.columns:
             df["total_score"] = 0
 
-        # 2) Map đúng/số mã bài từ view
-        # - num_solved_ex  -> total_correct
-        # - num_exercises  -> exercises_done
-        if "total_correct" not in df.columns:
-            if "num_solved_ex" in df.columns:
-                df["total_correct"] = df["num_solved_ex"]
-            else:
-                df["total_correct"] = 0
+        # 2) Map đúng/số mã bài từ view (ƯU TIÊN num_* nếu có)
+        if "num_solved_ex" in df.columns:
+            df["total_correct"] = df["num_solved_ex"]
+        elif "total_correct" not in df.columns:
+            df["total_correct"] = 0
 
-        if "exercises_done" not in df.columns:
-            if "num_exercises" in df.columns:
-                df["exercises_done"] = df["num_exercises"]
-            else:
-                df["exercises_done"] = 0
+        if "num_exercises" in df.columns:
+            df["exercises_done"] = df["num_exercises"]
+        elif "exercises_done" not in df.columns:
+            df["exercises_done"] = 0
 
         # 3) Ép kiểu số
         df["total_score"] = pd.to_numeric(df["total_score"], errors="coerce").fillna(0).astype(int)
@@ -3066,6 +3062,7 @@ def room_6_leaderboard():
         sort_cols = ["total_score", "total_correct", "exercises_done"]
         df = df.sort_values(sort_cols, ascending=[False, False, False]).reset_index(drop=True)
         df.insert(0, "Rank", df.index + 1)
+
 
 
         # Bộ lọc/search

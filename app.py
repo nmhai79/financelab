@@ -6,6 +6,9 @@ import altair as alt
 import streamlit as st
 import google.generativeai as genai
 from supabase import create_client, Client
+import hashlib
+import time
+
 
 MAX_AI_QUOTA = 10
 
@@ -55,6 +58,34 @@ def load_valid_students():
         st.error(f"⚠️ Lỗi đọc file Excel: {e}")
         return []
 
+@st.cache_resource
+def load_students_map():
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(current_dir, "dssv.xlsx")
+    df = pd.read_excel(file_path, dtype=str).fillna("")
+
+    # Chuẩn hóa MSSV
+    df["MSSV"] = df["MSSV"].astype(str).str.strip().str.upper()
+
+    # Bắt linh hoạt cột họ tên
+    name_col = None
+    for c in ["HoTen", "Họ tên", "HOTEN", "FullName", "Name"]:
+        if c in df.columns:
+            name_col = c
+            break
+
+    if name_col is None:
+        # Nếu chưa có cột tên thì trả rỗng để vẫn chạy được
+        return {m: "" for m in df["MSSV"].tolist()}
+
+    df[name_col] = df[name_col].astype(str).str.strip()
+    return dict(zip(df["MSSV"], df[name_col]))
+
+def get_student_name(mssv: str) -> str:
+    m = str(mssv).strip().upper()
+    mp = load_students_map()
+    return mp.get(m, "")
+
 # ------------------------------------------------------------------
 # PHẦN CODE MỚI: QUẢN LÝ QUOTA BẰNG SUPABASE
 # (Thay thế hoàn toàn phần RAM tracker cũ)
@@ -62,7 +93,9 @@ def load_valid_students():
 
 def get_usage_from_supabase(student_id):
     """Hàm phụ: Lấy số lượt dùng hiện tại từ Database"""
-    if not supabase_client: return 999 # Chặn nếu lỗi DB
+    if not supabase_client:
+        return None  # báo DB không sẵn sàng
+
     
     try:
         # Query bảng 'user_quota', tìm dòng có mssv tương ứng
@@ -130,6 +163,104 @@ def consume_quota(student_id):
     # Ghi số mới (cộng thêm 1) vào DB
     update_usage_to_supabase(clean_id, current_usage)
 
+# =========================
+# LEADERBOARD PRACTICE HELPERS
+# =========================
+def stable_seed(*parts) -> int:
+    """Seed ổn định theo MSSV + bài + attempt để đề không đổi khi rerun."""
+    s = "|".join(str(p) for p in parts)
+    return int(hashlib.sha256(s.encode("utf-8")).hexdigest()[:16], 16)
+
+def gen_case_D01(seed: int) -> tuple[dict, dict]:
+    """
+    D01: Cross-rate EUR/VND từ EUR/USD & USD/VND (Bid/Ask/Spread)
+    Trả về (params, answers)
+    """
+    rng = np.random.default_rng(seed)
+
+    # USD/VND: bid bội số 10, ask = bid + spread(80..160)
+    usd_bid = int(rng.integers(2400, 2701) * 10)  # 24,000 .. 27,000
+    usd_spread = int(rng.choice([80, 90, 100, 110, 120, 130, 140, 150, 160]))
+    usd_ask = usd_bid + usd_spread
+
+    # EUR/USD: bid 4 decimals, ask = bid + (0.0010..0.0030)
+    # EUR/USD bid theo bước 0.0005 (tick = 5 trên thang 1/10000)
+    eur_bid_ticks = int(rng.integers(10200 // 5, 11500 // 5 + 1) * 5)
+    eur_bid = eur_bid_ticks / 10000
+
+    eur_mark = float(rng.integers(10, 31) / 10000)          # 0.0010..0.0030
+    eur_ask = round(eur_bid + eur_mark, 4)
+
+    # Theo code room_1_dealing: cross_bid=eur_bid*usd_bid; cross_ask=eur_ask*usd_ask
+    # Hiển thị dạng 0f => chấm theo làm tròn integer VND/EUR
+    cross_bid = int(round(eur_bid * usd_bid, 0))
+    cross_ask = int(round(eur_ask * usd_ask, 0))
+    spread = int(cross_ask - cross_bid)
+
+    params = {
+        "usd_bid": usd_bid, "usd_ask": usd_ask,
+        "eur_bid": eur_bid, "eur_ask": eur_ask,
+    }
+    answers = {
+        "cross_bid": cross_bid,
+        "cross_ask": cross_ask,
+        "spread": spread,
+    }
+    return params, answers
+
+def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
+    """Kiểm tra attempt đã nộp chưa."""
+    if not supabase_client:
+        return None
+    try:
+        res = (
+            supabase_client.table("lab_attempts")
+            .select("id,is_correct,score,created_at,answer_json,params_json")
+            .eq("mssv", mssv)
+            .eq("exercise_code", exercise_code)
+            .eq("attempt_no", attempt_no)
+            .limit(1)
+            .execute()
+        )
+        return res.data[0] if res.data else None
+    except Exception as e:
+        st.error(f"⚠️ Lỗi đọc lab_attempts: {e}")
+        return None
+
+def insert_attempt(payload: dict) -> bool:
+    """Ghi attempt vào DB."""
+    if not supabase_client:
+        st.error("⚠️ Chưa kết nối Supabase.")
+        return False
+    try:
+        supabase_client.table("lab_attempts").insert(payload).execute()
+        return True
+    except Exception as e:
+        st.error(f"⚠️ Lỗi ghi lab_attempts: {e}")
+        return False
+
+def reward_ai_calls_by_decreasing_usage(mssv: str, bonus_calls: int = 2):
+    """
+    Thưởng thêm lượt gọi AI theo mô hình hiện tại:
+    - DB đang lưu 'usage' (đã dùng).
+    - Thưởng = GIẢM usage đi bonus_calls (tối thiểu = 0).
+    => SV sẽ có thêm 'remaining' lượt dùng.
+    """
+    if not supabase_client:
+        return
+    try:
+        cur = int(get_usage_from_supabase(mssv))
+        if cur >= 999:
+            return
+        new_usage = max(cur - bonus_calls, 0)
+        supabase_client.table("user_quota").upsert(
+            {"mssv": mssv, "usage": new_usage},
+            on_conflict="mssv"
+        ).execute()
+    except Exception as e:
+        st.error(f"⚠️ Lỗi thưởng lượt AI: {e}")
+
+
 # ==============================================================================
 # 0) PAGE CONFIG
 # ==============================================================================
@@ -139,6 +270,49 @@ st.set_page_config(
     initial_sidebar_state="expanded",
     page_icon="🏦",
 )
+
+# =========================
+# EXERCISE CATALOG (APPROVED)
+# =========================
+EXERCISE_CATALOG = {
+    # PHÒNG 1: DEALING ROOM
+    "DEALING": [
+        {"code": "D01", "title": "Niêm yết Cross-rate Bid–Ask–Spread (EUR/VND từ EUR/USD & USD/VND)"},
+        {"code": "D02", "title": "Arbitrage tam giác (Có/Không + hướng giao dịch tối ưu)"},
+    ],
+
+    # PHÒNG 2: RISK MANAGEMENT (loại R2-03 nâng cao)
+    "RISK": [
+        {"code": "R01", "title": "Forward Rate hợp lý theo IRP (tính F từ S, i_dom, i_for, số ngày)"},
+        {"code": "R02", "title": "Chọn công cụ phòng vệ tối ưu (Forward vs Option vs No Hedge)"},
+    ],
+
+    # PHÒNG 3: TRADE FINANCE
+    "TRADE": [
+        {"code": "T01", "title": "Tối ưu chi phí phương thức thanh toán (T/T vs Nhờ thu vs L/C)"},
+        {"code": "T02", "title": "UCP 600 – Phát hiện Discrepancy (Checking bộ chứng từ)"},
+    ],
+
+    # PHÒNG 4: INVESTMENT
+    "INVEST": [
+        {"code": "I01", "title": "Thẩm định dự án FDI: NPV + Quyết định Đầu tư/Không"},
+        {"code": "I02", "title": "IRR vs WACC: Dự án đạt chuẩn hay không"},        
+    ],
+
+    # PHÒNG 5: MACRO STRATEGY
+    "MACRO": [
+        {"code": "M01", "title": "Cú sốc tỷ giá lên Nợ công (tỷ giá mới + gánh nặng tăng thêm)"},
+        {"code": "M02", "title": "Carry Trade: ROI/P&L khi chênh lệch lãi suất + biến động FX"},
+    ],
+}
+
+ROOM_LABELS = {
+    "DEALING": "💱 Sàn Kinh doanh Ngoại hối (Dealing Room)",
+    "RISK": "🛡️ Phòng Quản trị Rủi ro (Risk Management)",
+    "TRADE": "🚢 Phòng Thanh toán Quốc tế (Trade Finance)",
+    "INVEST": "🏭 Phòng Đầu tư Quốc tế (Investment Dept)",
+    "MACRO": "📉 Ban Chiến lược Vĩ mô (Macro Strategy)",
+}
 
 # ==============================================================================
 # 1) STYLE (UI + MOBILE RESPONSIVE)
@@ -326,6 +500,90 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem; }
     text-align: center;
     margin-top: 36px;
 }
+
+/* ========================================================= */
+/* 3. SIDEBAR NAV BUTTONS (CHỈ ÁP DỤNG CHO MENU ĐIỀU HƯỚNG)   */
+/* ========================================================= */
+
+.nav-menu div[data-testid="stButton"] > button {
+  border-radius: 14px !important;
+  padding: 0.85rem 0.9rem !important;
+  font-weight: 800 !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  transition: all .18s ease-in-out !important;
+  margin-bottom: 10px !important;
+}
+
+/* Nút menu bình thường (secondary) -> MÀU XANH DƯƠNG/THANH LỊCH */
+.nav-menu div[data-testid="stButton"] > button[kind="secondary"]{
+  background: linear-gradient(180deg, #1e88e5 0%, #1565c0 100%) !important;
+  color: #fff !important;
+}
+
+/* Hover menu bình thường */
+.nav-menu div[data-testid="stButton"] > button[kind="secondary"]:hover{
+  background: linear-gradient(180deg, #42a5f5 0%, #1976d2 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 10px 18px rgba(21,101,192,0.25) !important;
+}
+
+/* Nút menu đang chọn (primary) -> MÀU TÍM/ĐỎ RƯỢU (khác AI button đỏ) */
+.nav-menu div[data-testid="stButton"] > button[kind="primary"]{
+  background: linear-gradient(180deg, #8e24aa 0%, #6a1b9a 100%) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+/* Hover nút menu đang chọn */
+.nav-menu div[data-testid="stButton"] > button[kind="primary"]:hover{
+  background: linear-gradient(180deg, #ab47bc 0%, #7b1fa2 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 10px 20px rgba(106,27,154,0.25) !important;
+}
+
+/* ========================================================= */
+/* FORCE OVERRIDE MENU BUTTONS IN SIDEBAR                    */
+/* ========================================================= */
+
+/* Chỉ áp dụng cho nút trong SIDEBAR */
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]{
+  background: linear-gradient(180deg, #1e88e5 0%, #1565c0 100%) !important;
+  color: #fff !important;
+  border: 1px solid rgba(0,0,0,0.06) !important;
+  border-radius: 14px !important;
+  font-weight: 800 !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  transition: all .18s ease-in-out !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]:hover{
+  background: linear-gradient(180deg, #42a5f5 0%, #1976d2 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 10px 18px rgba(21,101,192,0.25) !important;
+}
+
+/* Nút đang chọn (primary) trong sidebar */
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]{
+  background: linear-gradient(180deg, #8e24aa 0%, #6a1b9a 100%) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 14px !important;
+  font-weight: 900 !important;
+  box-shadow: 0 6px 14px rgba(106,27,154,0.25) !important;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"]:hover{
+  background: linear-gradient(180deg, #ab47bc 0%, #7b1fa2 100%) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* spacing đẹp hơn */
+section[data-testid="stSidebar"] div[data-testid="stButton"]{
+  margin-bottom: 10px !important;
+}
+
+
 </style>
         """,
         unsafe_allow_html=True,
@@ -461,10 +719,11 @@ with st.sidebar:
 
     # 1. Nhập liệu
     # Dùng key='login_mssv' để Streamlit tự nhớ giá trị trong ô input
-    input_mssv = st.text_input("Nhập MSSV kích hoạt AI:", key="login_mssv").strip()
+    input_mssv_raw = st.text_input("Nhập MSSV kích hoạt AI:", key="login_mssv").strip()
+    input_mssv = input_mssv_raw.upper()
     
     # 2. Xử lý logic xác thực
-    valid_list = load_valid_students() # Hàm load Excel (đã có ở trên)
+    valid_list = list(load_students_map().keys()) # = load_valid_students() # Hàm load Excel (đã có ở trên)
     
     # Mặc định là chưa đăng nhập
     st.session_state['CURRENT_USER'] = None 
@@ -475,19 +734,21 @@ with st.sidebar:
             # A. Đăng nhập thành công -> Lưu vào Session State (QUAN TRỌNG)
             st.session_state['CURRENT_USER'] = input_mssv
             
-            st.success(f"Xin chào: {input_mssv}")
+            hoten = get_student_name(input_mssv)
+            hello = f"Xin chào: {hoten} ({input_mssv})" if hoten else f"Xin chào: {input_mssv}"
+            st.success(hello)
             
             # [QUAN TRỌNG] Tạo một cái hộp rỗng và gán vào biến 'quota_placeholder'
             quota_placeholder = st.empty()
             # B. Hiển thị số lượt đã dùng ngay tại đây cho SV thấy
             current_used = get_usage_from_supabase(input_mssv)
-            
-            # Đổi màu hiển thị cho sinh động
-            if current_used < MAX_AI_QUOTA:
+
+            if current_used is None:
+                quota_placeholder.error("⛔ Không kết nối được Database quota nên tạm khóa AI. Bạn vẫn thực hành bình thường.")
+            elif current_used < MAX_AI_QUOTA:
                 quota_placeholder.caption(f"✅ Đã dùng: **{current_used}/{MAX_AI_QUOTA}** lượt gọi AI.")
             else:
-                quota_placeholder.error(f"⛔ Đã dùng hết: **{current_used}/{MAX_AI_QUOTA}** lượt gọi AI.")
-                
+                quota_placeholder.error(f"⛔ Đã dùng hết: **{current_used}/{MAX_AI_QUOTA}** lượt gọi AI.")                
         else:
             # C. Nhập sai
             st.error("⛔ Danh sách lớp không có MSSV này! Bạn vẫn thực hành bình thường nhưng không được dùng AI.")
@@ -503,21 +764,43 @@ with st.sidebar:
     #             API_KEY = key_in
     #             genai.configure(api_key=API_KEY)
     #             st.success("Đã nạp API Key cho phiên chạy hiện tại.")
-    st.markdown("---")
+    st.markdown("---")    
+
+    # ==============================
+    # SIDEBAR – BUTTON NAVIGATION
+    # ==============================
+
+    if "ROOM" not in st.session_state:
+        st.session_state["ROOM"] = "DEALING"
+
+    def room_button(label, key):
+        is_active = st.session_state.get("ROOM", "DEALING") == key
+
+        if st.button(
+            label,
+            use_container_width=True,
+            type="primary" if is_active else "secondary",
+            key=f"nav_{key}",  # nên có key riêng
+        ):
+            if st.session_state.get("ROOM") != key:
+                st.session_state["ROOM"] = key
+                st.rerun()  # <<< QUAN TRỌNG: rerender để đổi màu ngay
+
+
     st.header("🏢 SƠ ĐỒ TỔ CHỨC")
     st.write("Di chuyển đến:")
 
-    room = st.radio(
-        "Phòng nghiệp vụ:",
-        [
-            "1. Sàn Kinh doanh Ngoại hối (Dealing Room)",
-            "2. Phòng Quản trị Rủi ro (Risk Management)",
-            "3. Phòng Thanh toán Quốc tế (Trade Finance)",
-            "4. Phòng Đầu tư Quốc tế (Investment Dept)",
-            "5. Ban Chiến lược Vĩ mô (Macro Strategy)",
-        ],
-        label_visibility="collapsed",
-    )
+    st.markdown('<div class="nav-menu">', unsafe_allow_html=True)
+
+    room_button("💱 Sàn Kinh doanh Ngoại hối", "DEALING")
+    room_button("🛡️ Phòng Quản trị Rủi ro", "RISK")
+    room_button("🚢 Phòng Thanh toán Quốc tế", "TRADE")
+    room_button("📈 Phòng Đầu tư Quốc tế", "INVEST")
+    room_button("🌍 Ban Chiến lược Vĩ mô", "MACRO")
+    room_button("🏆 Bảng vàng Thành tích", "LEADERBOARD")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
 
     st.markdown("---")
     st.info("💡 Sau khi tính toán, hãy xem **Giải thích** hoặc gọi **Chuyên gia AI** để được tư vấn chuyên sâu.")
@@ -2129,20 +2412,626 @@ Làm báo cáo nhanh:
             
     footer()
 
+# =========================
+# LEADERBOARD HELPERS
+# =========================
+@st.cache_resource
+def load_student_lookup():
+    """
+    Đọc dssv.xlsx và tạo dict: MSSV -> Họ tên
+    - Nếu file hiện chỉ có 1 cột MSSV thì name sẽ rỗng
+    - Khi bạn upload file mới có cột họ tên, hàm tự nhận
+    """
+    try:
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(current_dir, "dssv.xlsx")
+        df = pd.read_excel(file_path, dtype=str)
+
+        # Chuẩn hóa tên cột linh hoạt
+        cols = {c.strip().lower(): c for c in df.columns}
+        mssv_col = cols.get("mssv") or cols.get("ma sv") or cols.get("student_id") or cols.get("student id")
+        hoten_col = cols.get("hoten") or cols.get("họ tên") or cols.get("ho ten") or cols.get("fullname") or cols.get("full name")
+
+        if not mssv_col:
+            return {}
+
+        df[mssv_col] = df[mssv_col].astype(str).str.strip().str.upper()
+        if hoten_col:
+            df[hoten_col] = df[hoten_col].astype(str).str.strip()
+            return dict(zip(df[mssv_col], df[hoten_col]))
+        else:
+            return {m: "" for m in df[mssv_col].tolist()}
+
+    except Exception:
+        return {}
+
+def get_student_name(mssv: str) -> str:
+    mp = load_student_lookup()
+    name = mp.get(str(mssv).strip().upper(), "")
+    return name.strip()
+
+def fetch_my_attempts(mssv: str, limit: int = 2000):
+    if not supabase_client:
+        return []
+    try:
+        res = (
+            supabase_client.table("lab_attempts")
+            .select("mssv,hoten,lop,room,exercise_code,attempt_no,score,is_correct,duration_sec,created_at")
+            .eq("mssv", mssv)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        st.error(f"⚠️ Lỗi đọc lab_attempts: {e}")
+        return []
+
+def fetch_class_leaderboard_from_view(limit: int = 200):
+    """
+    Ưu tiên đọc VIEW 'lab_leaderboard' (best-of-3).
+    Nếu view chưa tồn tại / lỗi, trả về None để fallback.
+    """
+    if not supabase_client:
+        return None
+    try:
+        res = (
+            supabase_client.from_("lab_leaderboard")
+            .select("*")
+            .order("total_score", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception:
+        return None
+
+def compute_class_leaderboard_fallback(limit: int = 200):
+    """
+    Fallback: Tự tính leaderboard từ lab_attempts:
+    - best-of-3 mỗi bài: lấy MAX(score) theo (mssv, exercise_code)
+    - Tổng điểm = sum(best_score) theo mssv
+    """
+    if not supabase_client:
+        return []
+
+    try:
+        res = (
+            supabase_client.table("lab_attempts")
+            .select("mssv,hoten,room,exercise_code,attempt_no,score,is_correct,created_at")
+            .limit(5000)
+            .execute()
+        )
+        rows = res.data or []
+        if not rows:
+            return []
+
+        df = pd.DataFrame(rows)
+        df["mssv"] = df["mssv"].astype(str).str.strip().str.upper()
+
+        # best-of-3: attempt_no đã là 1..3 => giữ nguyên
+        g = (
+            df.groupby(["mssv", "exercise_code"], as_index=False)
+              .agg(
+                  best_score=("score", "max"),
+                  best_correct=("is_correct", "max"),
+                  room=("room", "last"),
+                  hoten=("hoten", "last"),
+                  last_submit=("created_at", "max"),
+              )
+        )
+
+        lb = (
+            g.groupby("mssv", as_index=False)
+             .agg(
+                 total_score=("best_score", "sum"),
+                 total_correct=("best_correct", "sum"),
+                 exercises_done=("exercise_code", "nunique"),
+                 hoten=("hoten", "last"),
+                 room=("room", "last"),
+                 last_submit=("last_submit", "max"),
+             )
+        )
+
+        lb = lb.sort_values(["total_score", "total_correct", "exercises_done", "last_submit"], ascending=[False, False, False, False])
+        lb = lb.head(limit)
+
+        return lb.to_dict(orient="records")
+
+    except Exception as e:
+        st.error(f"⚠️ Lỗi tính leaderboard fallback: {e}")
+        return []
+
+
+# ======= PHÒNG 6 BẢNG VÀNG THÀNH TÍCH ========
+def room_6_leaderboard():
+
+    st.markdown(
+        '<p class="header-style">🏆 PHÒNG BẢNG VÀNG THÀNH TÍCH</p>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">👤 Vai diễn: Sinh viên – Nhà vô địch Lab</div>
+  <div class="mission-text">
+  "Nhiệm vụ: Hoàn thành các bài tập nghiệp vụ, tích lũy điểm số và cạnh tranh thứ hạng cá nhân & toàn lớp."
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ====== YÊU CẦU ĐĂNG NHẬP MSSV RIÊNG CHO ROOM NÀY ======
+    if "LAB_MSSV" not in st.session_state:
+        st.session_state["LAB_MSSV"] = ""
+
+    st.caption("🔒 Vui lòng nhập MSSV hợp lệ (theo danh sách lớp) để làm bài tập và xem bảng xếp hạng.")
+
+    # Nếu CHƯA có MSSV -> hiện form đăng nhập
+    if not st.session_state["LAB_MSSV"]:
+        lab_input = st.text_input(
+            "Nhập MSSV để vào Phòng Bảng vàng:",
+            value="",
+            key="lab_mssv_input",
+        )
+
+        if st.button("✅ Xác nhận MSSV", use_container_width=True, key="btn_lab_login"):
+            clean_id = str(lab_input).strip().upper()
+            valid_list = load_valid_students()  # dùng lại Excel dssv.xlsx
+
+            if clean_id not in valid_list:
+                st.error("❌ MSSV không hợp lệ hoặc không có trong danh sách lớp.")
+                st.stop()
+
+            st.session_state["LAB_MSSV"] = clean_id
+            hoten = get_student_name(clean_id)
+            hello = f"✅ Xin chào: {hoten} ({clean_id})" if hoten else f"✅ Xin chào: {clean_id}"
+            st.success(hello)
+            st.rerun()
+
+    # Nếu ĐÃ có MSSV -> hiển thị lời chào + nút đổi MSSV (ẩn gọn)
+    else:
+        clean_id = str(st.session_state["LAB_MSSV"]).strip().upper()
+        hoten = get_student_name(clean_id)
+        hello = f"✅ Xin chào: {hoten} ({clean_id})" if hoten else f"✅ Xin chào: {clean_id}"
+        st.success(hello)
+
+        with st.expander("⚙️ Tùy chọn", expanded=False):
+            if st.button("🔁 Đổi MSSV", use_container_width=True, key="btn_change_mssv"):
+                st.session_state["LAB_MSSV"] = ""
+                st.rerun()
+
+    # Nếu chưa đăng nhập thì KHÔNG cho hiện tab
+    if not st.session_state["LAB_MSSV"]:
+        st.stop()
+        # ====== HIỂN THỊ TAB BẢNG VÀNG ======
+
+    tab_practice, tab_my, tab_class = st.tabs(
+        [
+            "🎯 Làm bài tập",
+            "🥇 Bảng vàng cá nhân",
+            "🏫 Bảng xếp hạng lớp",
+        ]
+    )
+
+    # =========================================================
+    # TAB 1: PRACTICE
+    # =========================================================
+    with tab_practice:
+        st.subheader("🎯 Thực hành & tính điểm")
+        st.info(
+            """
+- Mỗi bài tập có **tham số ngẫu nhiên** (không trùng đề).
+- Mỗi bài được làm **tối đa 3 lần**.
+"""
+        )
+
+        # --- Session defaults ---
+        if "ACTIVE_ROOM" not in st.session_state:
+            st.session_state["ACTIVE_ROOM"] = "DEALING"
+        if "ACTIVE_EX_CODE" not in st.session_state:
+            st.session_state["ACTIVE_EX_CODE"] = "D01"
+        if "ACTIVE_ATTEMPT" not in st.session_state:
+            st.session_state["ACTIVE_ATTEMPT"] = 1
+
+        # --- A) Bộ chọn phòng / mã bài ---
+        c1, c2 = st.columns([1.2, 1.8])
+        with c1:
+            room_key = st.selectbox(
+                "Chọn phòng nghiệp vụ",
+                options=list(ROOM_LABELS.keys()),
+                format_func=lambda k: ROOM_LABELS[k],
+                index=list(ROOM_LABELS.keys()).index(st.session_state["ACTIVE_ROOM"]),
+                key="sel_room_key",
+            )
+            st.session_state["ACTIVE_ROOM"] = room_key
+
+        # Tạo list bài theo phòng
+        exercises = EXERCISE_CATALOG.get(room_key, [])
+        ex_options = [f'{e["code"]} — {e["title"]}' for e in exercises]
+        ex_codes = [e["code"] for e in exercises]
+
+        with c2:
+            # Nếu mã bài hiện tại không thuộc phòng đang chọn -> reset về bài đầu
+            if st.session_state["ACTIVE_EX_CODE"] not in ex_codes and len(ex_codes) > 0:
+                st.session_state["ACTIVE_EX_CODE"] = ex_codes[0]
+
+            ex_idx = ex_codes.index(st.session_state["ACTIVE_EX_CODE"]) if st.session_state["ACTIVE_EX_CODE"] in ex_codes else 0
+            ex_pick = st.selectbox(
+                "Chọn mã bài tập",
+                options=ex_options,
+                index=ex_idx,
+                key="sel_ex_pick",
+            )
+            # Parse code
+            picked_code = ex_pick.split("—")[0].strip()
+            st.session_state["ACTIVE_EX_CODE"] = picked_code
+
+        # --- B) Chọn lần làm (Attempt 1/2/3) ---
+        st.caption("Chọn **lần làm bài** (tối đa 3 lần). Sau này hệ thống sẽ lấy **điểm cao nhất (best-of-3)** cho mỗi mã bài.")
+        a1, a2, a3 = st.columns(3)
+
+        def attempt_btn(label, n, key):
+            btn_type = "primary" if st.session_state["ACTIVE_ATTEMPT"] == n else "secondary"
+            if st.button(label, type=btn_type, use_container_width=True, key=key):
+                st.session_state["ACTIVE_ATTEMPT"] = n
+                st.rerun()
+
+        with a1:
+            attempt_btn("1️⃣ Lần 1", 1, "btn_attempt_1")
+        with a2:
+            attempt_btn("2️⃣ Lần 2", 2, "btn_attempt_2")
+        with a3:
+            attempt_btn("3️⃣ Lần 3", 3, "btn_attempt_3")
+
+        st.markdown("---")
+
+        # --- C) Tóm tắt lựa chọn + vùng “workspace” để lát nữa render đề ---
+        mssv = st.session_state.get("LAB_MSSV", "")
+        st.info(
+            f"👤 SV: **{mssv}**  |  🏢 Phòng: **{st.session_state['ACTIVE_ROOM']}**  |  📌 Bài: **{st.session_state['ACTIVE_EX_CODE']}**  |  🔁 Lần: **{st.session_state['ACTIVE_ATTEMPT']}**"
+        )
+
+        st.markdown("### 🧩 Khu vực làm bài (Workspace)")
+
+        mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
+        room_key = st.session_state.get("ACTIVE_ROOM", "DEALING")
+        ex_code = st.session_state.get("ACTIVE_EX_CODE", "D01")
+        attempt_no = int(st.session_state.get("ACTIVE_ATTEMPT", 1))
+
+        # Chỉ demo D01 trước
+        if not (room_key == "DEALING" and ex_code == "D01"):
+            st.info("👉 Demo hiện tại chỉ kích hoạt cho **D01 (Dealing Room)**. Bạn chọn D01 để thử.")
+            st.stop()
+
+        # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại thông tin
+        existing = fetch_attempt(mssv, ex_code, attempt_no)
+        if existing:
+            st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+            params = existing.get("params_json", {}) or {}
+            ans = existing.get("answer_json", {}) or {}
+
+            st.write("**Đề bài bạn đã nhận (từ DB):**")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("##### 🇺🇸 USD/VND")
+                st.write(f"BID: **{params.get('usd_bid','-'):,.0f}**")
+                st.write(f"ASK: **{params.get('usd_ask','-'):,.0f}**")
+            with c2:
+                st.markdown("##### 🇪🇺 EUR/USD")
+                st.write(f"BID: **{params.get('eur_bid','-')}**")
+                st.write(f"ASK: **{params.get('eur_ask','-')}**")
+
+            st.markdown("**Đáp án chuẩn (để bạn đối chiếu học tập):**")
+            st.success(
+                f"EUR/VND = **{ans.get('cross_bid','-'):,.0f} - {ans.get('cross_ask','-'):,.0f}** | Spread = **{ans.get('spread','-'):,.0f}**"
+            )
+            st.stop()
+
+        # 2) Sinh đề theo seed ổn định
+        seed = stable_seed(mssv, ex_code, attempt_no)
+        params, answers = gen_case_D01(seed)
+
+        # 3) Ghi nhận thời điểm bắt đầu (để sau này nếu bạn muốn tính thời gian thì có sẵn)
+        start_key = f"START_{mssv}_{ex_code}_{attempt_no}"
+        if start_key not in st.session_state:
+            st.session_state[start_key] = time.time()
+
+        # 4) Hiển thị đề bài
+        st.markdown(
+            f"""
+        <div class="role-card">
+        <div class="role-title">📝 Bài D01 — Niêm yết tỷ giá chéo EUR/VND (Bid–Ask–Spread)</div>
+        <div class="mission-text">
+            Dựa trên báo giá thị trường dưới đây, hãy tính <b>EUR/VND Bid</b>, <b>EUR/VND Ask</b> và <b>Spread</b>.
+            (Làm tròn đến <b>đơn vị VND</b>)
+        </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("##### 🇺🇸 Thị trường 1: USD/VND")
+            st.write(f"BID (NH mua USD): **{params['usd_bid']:,.0f}**")
+            st.write(f"ASK (NH bán USD): **{params['usd_ask']:,.0f}**")
+        with c2:
+            st.markdown("##### 🇪🇺 Thị trường 2: EUR/USD")
+            st.write(f"BID (NH mua EUR): **{params['eur_bid']:.4f}**")
+            st.write(f"ASK (NH bán EUR): **{params['eur_ask']:.4f}**")
+
+        st.markdown("---")
+
+        # 5) SV nhập đáp án
+        st.caption("✍️ Nhập kết quả (làm tròn 0 chữ số thập phân – VND/EUR)")
+
+        a1, a2, a3 = st.columns(3)
+        with a1:
+            in_bid = st.number_input("EUR/VND BID", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_bid_{attempt_no}")
+        with a2:
+            in_ask = st.number_input("EUR/VND ASK", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_ask_{attempt_no}")
+        with a3:
+            in_spread = st.number_input("SPREAD", min_value=0.0, step=1.0, format="%.0f", key=f"d01_in_spread_{attempt_no}")
+
+        # 6) Nộp bài -> chấm
+        TOL = 2  # cho phép lệch ±2 VND do làm tròn/nhập nhanh
+
+        if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_d01_{attempt_no}"):
+            # Chấm đúng/sai
+            is_ok = (
+                abs(int(in_bid) - answers["cross_bid"]) <= TOL
+                and abs(int(in_ask) - answers["cross_ask"]) <= TOL
+                and abs(int(in_spread) - answers["spread"]) <= TOL
+            )
+
+            score = 10 if is_ok else 0         
+
+            duration_sec = int(time.time() - st.session_state[start_key])
+
+            payload = {
+                "mssv": mssv,
+                "hoten": None,           # sau này bạn map từ Excel mới thì fill vào
+                "lop": None,             # optional
+                "room": "DEALING",
+                "exercise_code": ex_code,
+                "attempt_no": attempt_no,
+                "seed": int(seed),
+                "params_json": params,
+                "answer_json": answers,
+                "is_correct": bool(is_ok),
+                "score": int(score),
+                "duration_sec": int(duration_sec),                
+                "note": f"D01 attempt {attempt_no}",
+            }
+
+            ok = insert_attempt(payload)
+            if not ok:
+                st.stop()
+
+            if is_ok:
+                st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+                reward_ai_calls_by_decreasing_usage(mssv, bonus_calls=2)
+            else:
+                st.error(f"❌ CHƯA ĐÚNG. Bạn được **{score} điểm** (0 điểm).")
+
+            st.info(
+                f"📌 Đáp án chuẩn: EUR/VND = **{answers['cross_bid']:,.0f} - {answers['cross_ask']:,.0f}** | Spread = **{answers['spread']:,.0f}**"
+            )
+
+            st.rerun()
+
+        #st.markdown("👉 (Sắp triển khai) Danh sách bài tập theo từng phòng nghiệp vụ.")
+
+    # =========================================================
+    # TAB 2: MY STATS
+    # =========================================================
+    with tab_my:
+        st.subheader("🥇 Thành tích cá nhân")
+        st.info(
+            """
+Hiển thị:
+- Tổng điểm tích lũy
+- Số bài đã làm / đúng
+"""
+        )
+
+        mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
+        hoten = get_student_name(mssv)
+
+        st.markdown("### 🥇 Bảng vàng cá nhân (My Stats)")
+        if hoten:
+            st.success(f"Xin chào **{hoten}** ({mssv})")
+        else:
+            st.success(f"Xin chào **{mssv}**")
+
+        rows = fetch_my_attempts(mssv)
+        if not rows:
+            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài** để bắt đầu.")
+            st.stop()
+
+        df = pd.DataFrame(rows)
+        # chuẩn hóa
+        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
+        df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
+        df["is_correct"] = df["is_correct"].astype(bool)
+
+        # Best-of-3 theo từng bài
+        per_ex = (
+            df.groupby("exercise_code", as_index=False)
+            .agg(
+                best_score=("score", "max"),
+                best_correct=("is_correct", "max"),
+                attempts_done=("attempt_no", "nunique"),
+                last_submit=("created_at", "max"),
+            )
+            .sort_values(["best_score", "best_correct", "attempts_done", "last_submit"], ascending=[False, False, False, False])
+        )
+
+        total_score = int(per_ex["best_score"].sum())
+        total_correct = int(per_ex["best_correct"].sum())
+        exercises_done = int(per_ex["exercise_code"].nunique())
+        attempts_total = int(df.shape[0])
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("🎯 Tổng điểm (best-of-3)", f"{total_score}")
+        c2.metric("✅ Số bài đúng", f"{total_correct}")
+        c3.metric("📌 Số mã bài đã làm", f"{exercises_done}")
+        c4.metric("🧾 Tổng lượt nộp", f"{attempts_total}")
+
+        st.markdown("---")
+        st.subheader("📌 Điểm tốt nhất theo từng mã bài (Best-of-3)")
+
+        show_ex = per_ex.rename(columns={
+            "exercise_code": "Mã bài",
+            "best_score": "Điểm cao nhất",
+            "best_correct": "Đúng (1/0)",
+            "attempts_done": "Số lần đã nộp",
+            "last_submit": "Nộp gần nhất",
+        })
+        show_ex["Đúng (1/0)"] = show_ex["Đúng (1/0)"].astype(int)
+
+        st.dataframe(show_ex, use_container_width=True, hide_index=True)
+
+        st.markdown("---")
+        st.subheader("🕒 Lịch sử nộp gần nhất")
+        recent = df.sort_values("created_at", ascending=False).head(15).copy()
+        recent = recent[["created_at","room","exercise_code","attempt_no","score","is_correct"]]
+        recent = recent.rename(columns={
+            "created_at":"Thời điểm",
+            "room":"Phòng",
+            "exercise_code":"Mã bài",
+            "attempt_no":"Lần",
+            "score":"Điểm",
+            "is_correct":"Đúng?",
+        })
+        recent["Đúng?"] = recent["Đúng?"].astype(bool).map({True:"✅", False:"❌"})
+        st.dataframe(recent, use_container_width=True, hide_index=True)
+
+    # =========================================================
+    # TAB 3: CLASS LEADERBOARD
+    # =========================================================
+    with tab_class:
+        st.subheader("🏫 Bảng xếp hạng toàn lớp")
+        st.info(
+            """
+- Xếp hạng theo **tổng điểm**
+- Dùng để quay số **chọn Top 5 cuối kỳ**
+"""
+        )
+
+        mssv = st.session_state.get("LAB_MSSV", "").strip().upper()
+        my_name = get_student_name(mssv)
+
+        st.markdown("### 🏫 Bảng xếp hạng lớp (Class Leaderboard)")
+        st.caption("Xếp hạng dựa trên **tổng điểm best-of-3** của mỗi mã bài. (Không dùng thời gian)")
+
+        # 1) Ưu tiên view
+        data = fetch_class_leaderboard_from_view(limit=300)
+
+        # 2) Fallback nếu view chưa có / lỗi
+        if data is None or len(data) == 0:
+            st.info("ℹ️ Chưa đọc được VIEW `lab_leaderboard` → dùng chế độ tính tạm từ `lab_attempts`.")
+            data = compute_class_leaderboard_fallback(limit=300)
+
+        if not data:
+            st.warning("Chưa có dữ liệu xếp hạng. Lớp chưa nộp bài nào.")
+            st.stop()
+
+        df = pd.DataFrame(data)
+
+        # Chuẩn hóa vài cột phổ biến (view/fallback có thể khác nhau)
+        # ưu tiên các cột: mssv, hoten, total_score, total_correct, exercises_done, last_submit
+        if "mssv" in df.columns:
+            df["mssv"] = df["mssv"].astype(str).str.strip().str.upper()
+
+        # Nếu view chưa có họ tên, lấy từ Excel
+        if "hoten" not in df.columns:
+            df["hoten"] = df["mssv"].apply(get_student_name)
+
+        # Chuẩn hoá tên cột điểm
+        if "total_score" not in df.columns and "total" in df.columns:
+            df["total_score"] = df["total"]
+        if "total_score" not in df.columns:
+            # fallback an toàn
+            df["total_score"] = 0
+
+        if "total_correct" not in df.columns:
+            df["total_correct"] = 0
+        if "exercises_done" not in df.columns:
+            df["exercises_done"] = 0
+
+        df["total_score"] = pd.to_numeric(df["total_score"], errors="coerce").fillna(0).astype(int)
+        df["total_correct"] = pd.to_numeric(df["total_correct"], errors="coerce").fillna(0).astype(int)
+        df["exercises_done"] = pd.to_numeric(df["exercises_done"], errors="coerce").fillna(0).astype(int)
+
+        # Sắp xếp lại để chắc chắn đúng thứ tự
+        sort_cols = ["total_score", "total_correct", "exercises_done"]
+        df = df.sort_values(sort_cols, ascending=[False, False, False]).reset_index(drop=True)
+        df.insert(0, "Rank", df.index + 1)
+
+        # Bộ lọc/search
+        c1, c2 = st.columns([2, 1])
+        with c1:
+            kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key="lb_search")
+        with c2:
+            top_n = st.selectbox("Hiển thị Top", [20, 50, 100, 200], index=1, key="lb_top_n")
+
+        show = df.copy()
+        if kw.strip():
+            k = kw.strip().lower()
+            show = show[
+                show["mssv"].astype(str).str.lower().str.contains(k)
+                | show["hoten"].astype(str).str.lower().str.contains(k)
+            ]
+
+        show = show.head(int(top_n))
+
+        # Bảng hiển thị
+        show2 = show[["Rank","hoten","mssv","total_score","total_correct","exercises_done"]].rename(columns={
+            "hoten":"Họ tên",
+            "mssv":"MSSV",
+            "total_score":"Tổng điểm",
+            "total_correct":"Bài đúng",
+            "exercises_done":"Số mã bài",
+        })
+
+        st.dataframe(show2, use_container_width=True, hide_index=True)
+
+        # Hiển thị rank cá nhân
+        my_row = df[df["mssv"] == mssv]
+        st.markdown("---")
+        if not my_row.empty:
+            r = int(my_row.iloc[0]["Rank"])
+            sc = int(my_row.iloc[0]["total_score"])
+            cr = int(my_row.iloc[0]["total_correct"])
+            exd = int(my_row.iloc[0]["exercises_done"])
+            if my_name:
+                st.success(f"📌 Vị trí của **{my_name} ({mssv})**: **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
+            else:
+                st.success(f"📌 Vị trí của bạn ({mssv}): **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
+        else:
+            st.info("Bạn chưa có dữ liệu xếp hạng (chưa nộp bài hoặc chưa đồng bộ).")
+
+    footer()
 
 # ==============================================================================
 # ROUTER
 # ==============================================================================
-if "1." in room:
+room = st.session_state.get("ROOM", "DEALING")
+
+if room == "DEALING":
     room_1_dealing()
-elif "2." in room:
+elif room == "RISK":
     room_2_risk()
-elif "3." in room:
+elif room == "TRADE":
     room_3_trade()
-elif "4." in room:
+elif room == "INVEST":
     room_4_invest()
-elif "5." in room:
+elif room == "MACRO":
     room_5_macro()
-
-
+elif room == "LEADERBOARD":
+    room_6_leaderboard()
 

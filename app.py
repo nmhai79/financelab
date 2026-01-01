@@ -173,6 +173,7 @@ def stable_seed(*parts) -> int:
     # lấy 16 hex (64-bit) rồi ép về miền signed 63-bit để không overflow bigint
     return int(h[:16], 16) & ((1 << 63) - 1)
 
+
 def gen_case_D01(seed: int) -> tuple[dict, dict]:
     """
     D01: Cross-rate EUR/VND từ EUR/USD & USD/VND (Bid/Ask/Spread)
@@ -2894,6 +2895,11 @@ Hiển thị:
             "last_submit": "Nộp gần nhất",
         })
         show_ex["Đúng (1/0)"] = show_ex["Đúng (1/0)"].astype(int)
+        # Format datetime đẹp hơn (giờ VN)
+        for col in ["Nộp gần nhất", "Thời điểm"]:
+            if col in show_ex.columns:
+                show_ex[col] = pd.to_datetime(show_ex[col], utc=True).dt.tz_convert("Asia/Ho_Chi_Minh").dt.strftime("%Y-%m-%d %H:%M")
+
 
         st.dataframe(show_ex, use_container_width=True, hide_index=True)
 
@@ -2910,6 +2916,10 @@ Hiển thị:
             "is_correct":"Đúng?",
         })
         recent["Đúng?"] = recent["Đúng?"].astype(bool).map({True:"✅", False:"❌"})
+        recent["Thời điểm"] = pd.to_datetime(recent["Thời điểm"], utc=True)\
+            .dt.tz_convert("Asia/Ho_Chi_Minh")\
+            .dt.strftime("%Y-%m-%d %H:%M")
+
         st.dataframe(recent, use_container_width=True, hide_index=True)
 
     # =========================================================
@@ -3036,8 +3046,4 @@ elif room == "MACRO":
     room_5_macro()
 elif room == "LEADERBOARD":
     room_6_leaderboard()
-
-
-
-
 

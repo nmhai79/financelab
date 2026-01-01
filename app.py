@@ -3030,26 +3030,43 @@ def room_6_leaderboard():
         mask_missing_name = df["hoten"].str.strip().isin(["", "none", "nan", "null"])
         df.loc[mask_missing_name, "hoten"] = df.loc[mask_missing_name, "mssv"].apply(get_student_name)
 
-        # Chuẩn hoá tên cột điểm
+        # =========================
+        # Chuẩn hoá các cột từ VIEW lab_leaderboard
+        # VIEW có: total_score, num_solved_ex, num_exercises
+        # App muốn dùng: total_score, total_correct, exercises_done
+        # =========================
+
+        # 1) total_score
         if "total_score" not in df.columns and "total" in df.columns:
             df["total_score"] = df["total"]
         if "total_score" not in df.columns:
-            # fallback an toàn
             df["total_score"] = 0
 
+        # 2) Map đúng/số mã bài từ view
+        # - num_solved_ex  -> total_correct
+        # - num_exercises  -> exercises_done
         if "total_correct" not in df.columns:
-            df["total_correct"] = 0
-        if "exercises_done" not in df.columns:
-            df["exercises_done"] = 0
+            if "num_solved_ex" in df.columns:
+                df["total_correct"] = df["num_solved_ex"]
+            else:
+                df["total_correct"] = 0
 
+        if "exercises_done" not in df.columns:
+            if "num_exercises" in df.columns:
+                df["exercises_done"] = df["num_exercises"]
+            else:
+                df["exercises_done"] = 0
+
+        # 3) Ép kiểu số
         df["total_score"] = pd.to_numeric(df["total_score"], errors="coerce").fillna(0).astype(int)
         df["total_correct"] = pd.to_numeric(df["total_correct"], errors="coerce").fillna(0).astype(int)
         df["exercises_done"] = pd.to_numeric(df["exercises_done"], errors="coerce").fillna(0).astype(int)
 
-        # Sắp xếp lại để chắc chắn đúng thứ tự
+        # 4) Sort + Rank
         sort_cols = ["total_score", "total_correct", "exercises_done"]
         df = df.sort_values(sort_cols, ascending=[False, False, False]).reset_index(drop=True)
         df.insert(0, "Rank", df.index + 1)
+
 
         # Bộ lọc/search
         c1, c2 = st.columns([2, 1])

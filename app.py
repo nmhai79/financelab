@@ -2530,18 +2530,31 @@ def compute_class_leaderboard_fallback(limit: int = 200):
 
         df = pd.DataFrame(rows)
         df["mssv"] = df["mssv"].astype(str).str.strip().str.upper()
+        df["exercise_code"] = df["exercise_code"].astype(str).str.strip().str.upper()
 
-        # best-of-3: attempt_no đã là 1..3 => giữ nguyên
+        # Ép is_correct về 0/1 an toàn (trường hợp bool hoặc chuỗi)
+        def to01(x):
+            if isinstance(x, bool):
+                return 1 if x else 0
+            s = str(x).strip().lower()
+            return 1 if s in ("true", "1", "t", "yes", "y") else 0
+
+        df["is_correct_01"] = df["is_correct"].apply(to01)
+        df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
+
+
+        # best-of-3: attempt_no đã là 1..3
         g = (
             df.groupby(["mssv", "exercise_code"], as_index=False)
-              .agg(
-                  best_score=("score", "max"),
-                  best_correct=("is_correct", "max"),
-                  room=("room", "last"),
-                  hoten=("hoten", "last"),
-                  last_submit=("created_at", "max"),
-              )
+            .agg(
+                best_score=("score", "max"),
+                best_correct=("is_correct_01", "max"),   # ✅ dùng 0/1
+                room=("room", "last"),
+                hoten=("hoten", "last"),
+                last_submit=("created_at", "max"),
+            )
         )
+
 
         lb = (
             g.groupby("mssv", as_index=False)
@@ -3008,9 +3021,14 @@ def room_6_leaderboard():
         if "mssv" in df.columns:
             df["mssv"] = df["mssv"].astype(str).str.strip().str.upper()
 
-        # Nếu view chưa có họ tên, lấy từ Excel
+        # Nếu view chưa có hoten thì tạo
         if "hoten" not in df.columns:
-            df["hoten"] = df["mssv"].apply(get_student_name)
+            df["hoten"] = ""
+
+        # ✅ Bổ sung: nếu hoten bị NULL/None/rỗng -> lấy từ Excel
+        df["hoten"] = df["hoten"].fillna("").astype(str)
+        mask_missing_name = df["hoten"].str.strip().isin(["", "none", "nan", "null"])
+        df.loc[mask_missing_name, "hoten"] = df.loc[mask_missing_name, "mssv"].apply(get_student_name)
 
         # Chuẩn hoá tên cột điểm
         if "total_score" not in df.columns and "total" in df.columns:

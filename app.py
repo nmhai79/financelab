@@ -449,6 +449,215 @@ def gen_case_R02(seed: int) -> tuple[dict, dict]:
     }
     return params, answers
 
+def gen_case_T01(seed: int) -> tuple[dict, dict]:
+    rng = np.random.default_rng(int(seed))
+
+    # Invoice & kỳ hạn
+    amount_usd = int(rng.integers(20_000, 200_001) // 1000 * 1000)   # bội 1,000
+    tenor_days = int(rng.choice([30, 60, 90, 120]))
+
+    # Lãi suất cơ hội (nếu trả sớm sẽ mất lãi cơ hội)
+    opp_rate = float(rng.uniform(0.04, 0.09))  # 4% -> 9%
+
+    # --- Fees ---
+    # T/T
+    tt_fixed = float(rng.integers(10, 31))  # USD
+    tt_pct = float(rng.choice([0.0005, 0.0010, 0.0015, 0.0020]))  # 0.05% -> 0.20%
+
+    # Nhờ thu (D/A)
+    da_fixed = float(rng.integers(20, 61))
+    da_pct = float(rng.choice([0.0008, 0.0012, 0.0018, 0.0025]))  # 0.08% -> 0.25%
+
+    # L/C trả chậm
+    lc_fixed = float(rng.integers(50, 121))
+    lc_pct_per_quarter = float(rng.choice([0.0015, 0.0020, 0.0025, 0.0035, 0.0040]))  # 0.15% -> 0.40% / quý
+    lc_margin = float(rng.choice([0.05, 0.10, 0.15, 0.20]))  # ký quỹ 5% -> 20%
+    quarters = int(math.ceil(tenor_days / 90))
+
+    # --- Cost model (USD) ---
+    # T/T: trả ngay => opportunity cost trên toàn bộ invoice trong tenor_days
+    opp_cost_tt = amount_usd * opp_rate * (tenor_days / 360.0)
+    cost_tt = tt_fixed + tt_pct * amount_usd + opp_cost_tt
+
+    # D/A: trả cuối kỳ => giả định không mất opp cost (chỉ fee)
+    cost_da = da_fixed + da_pct * amount_usd
+
+    # L/C trả chậm: phí mở theo quý + fixed + opp cost trên phần ký quỹ
+    opp_cost_margin = amount_usd * lc_margin * opp_rate * (tenor_days / 360.0)
+    cost_lc = lc_fixed + (lc_pct_per_quarter * quarters * amount_usd) + opp_cost_margin
+
+    costs = {
+        "TT": round(cost_tt, 2),
+        "DA": round(cost_da, 2),
+        "LC": round(cost_lc, 2),
+    }
+    best_method = min(costs, key=costs.get)
+
+    params = {
+        "amount_usd": amount_usd,
+        "tenor_days": tenor_days,
+        "opp_rate": opp_rate,
+        "tt_fixed": tt_fixed,
+        "tt_pct": tt_pct,
+        "da_fixed": da_fixed,
+        "da_pct": da_pct,
+        "lc_fixed": lc_fixed,
+        "lc_pct_per_quarter": lc_pct_per_quarter,
+        "lc_margin": lc_margin,
+        "quarters": quarters,
+    }
+    answers = {
+        "best_method": best_method,   # "TT" | "DA" | "LC"
+        "costs": costs,
+        "min_cost": costs[best_method],
+    }
+    return params, answers
+
+from datetime import date, timedelta
+
+def gen_case_T02(seed: int) -> tuple[dict, dict]:
+    rng = np.random.default_rng(int(seed))
+
+    # --- Basic L/C terms (đơn giản nhưng đúng logic checking) ---
+    issue_date = date(2025, 1, 1) + timedelta(days=int(rng.integers(0, 330)))
+    latest_ship = issue_date + timedelta(days=int(rng.choice([30, 45, 60])))
+    expiry_date = latest_ship + timedelta(days=int(rng.choice([15, 21, 30])))
+
+    amount = int(rng.integers(50_000, 300_001) // 1000 * 1000)
+    tolerance = int(rng.choice([0, 5, 10]))  # % tolerance
+    goods = rng.choice([
+        "Coffee beans (Robusta)",
+        "Pepper (Black Pepper)",
+        "Cashew kernels",
+        "Frozen seafood",
+        "Textile garments",
+    ])
+
+    incoterm = rng.choice(["CIF", "FOB", "CFR"])
+    port_load = rng.choice(["Ho Chi Minh City, VN", "Hai Phong, VN", "Da Nang, VN"])
+    port_discharge = rng.choice(["Los Angeles, US", "Hamburg, DE", "Rotterdam, NL", "Tokyo, JP"])
+
+    # Buyer/Seller (dùng tên giả lập)
+    applicant = rng.choice(["ABC Import LLC", "Global Traders GmbH", "Sunrise Foods Co."])
+    beneficiary = rng.choice(["VN Export JSC", "Mekong Trading Co., Ltd.", "Saigon Agro Ltd."])
+
+    # --- Presented documents (đề sẽ hiển thị) ---
+    # Các giá trị dưới đây sẽ bị "bẻ" tùy sai biệt được chọn
+    presented = {
+        "invoice_amount": amount,
+        "invoice_currency": "USD",
+        "invoice_goods_desc": goods,
+        "invoice_incoterm": incoterm,
+
+        "bl_shipped_on_board": True,
+        "bl_ship_date": latest_ship,          # sẽ bị đổi nếu sai
+        "bl_port_load": port_load,
+        "bl_port_discharge": port_discharge,
+        "bl_originals": int(rng.choice([1, 2, 3])),  # sẽ bị đổi nếu sai
+
+        "insurance_present": True if incoterm == "CIF" else bool(rng.choice([True, False])),
+        "insurance_coverage_pct": 110 if incoterm == "CIF" else int(rng.choice([0, 100, 110])),
+        "insurance_currency": "USD",
+
+        "co_present": True,
+        "packing_list_present": True,
+        "documents_presented_within_days": int(rng.choice([5, 10, 15, 21])),
+    }
+
+    # --- Pool sai biệt (codes + description) ---
+    # Lưu ý: mô tả để SV hiểu, nhưng máy chấm dựa vào code.
+    DISCREPANCY_POOL = [
+        ("T02-01", "Invoice amount vượt quá mức cho phép theo L/C tolerance"),
+        ("T02-02", "Mô tả hàng hóa trên Invoice không phù hợp L/C"),
+        ("T02-03", "B/L ship date sau Latest shipment date"),
+        ("T02-04", "Thiếu số bản gốc B/L theo yêu cầu"),
+        ("T02-05", "Cảng xếp/dỡ trên B/L không đúng L/C"),
+        ("T02-06", "Không xuất trình Insurance trong điều kiện CIF"),
+        ("T02-07", "Insurance coverage < 110% (với CIF)"),
+        ("T02-08", "Xuất trình chứng từ trễ (late presentation)"),
+        ("T02-09", "Thiếu C/O (Certificate of Origin)"),
+        ("T02-10", "Thiếu Packing List"),
+    ]
+
+    # Random số sai biệt (1-3)
+    k = int(rng.integers(1, 4))
+    chosen = rng.choice(len(DISCREPANCY_POOL), size=k, replace=False)
+    chosen_codes = [DISCREPANCY_POOL[i][0] for i in chosen]
+
+    # --- Apply sai biệt vào bộ chứng từ ---
+    # 01: invoice amount vượt tolerance
+    if "T02-01" in chosen_codes:
+        # tăng vượt tolerance một chút
+        max_allowed = amount * (1 + tolerance/100.0)
+        presented["invoice_amount"] = int(max_allowed + rng.integers(500, 3000))
+
+    # 02: mô tả hàng hóa khác
+    if "T02-02" in chosen_codes:
+        presented["invoice_goods_desc"] = rng.choice(["Spare parts", "Rice", "Electronics components"])
+
+    # 03: ship date sau latest_ship
+    if "T02-03" in chosen_codes:
+        presented["bl_ship_date"] = latest_ship + timedelta(days=int(rng.integers(1, 8)))
+
+    # 04: thiếu originals
+    if "T02-04" in chosen_codes:
+        presented["bl_originals"] = int(rng.choice([0, 1]))  # thiếu rõ
+
+    # 05: sai cảng
+    if "T02-05" in chosen_codes:
+        presented["bl_port_discharge"] = rng.choice(["Singapore, SG", "Shanghai, CN", "Sydney, AU"])
+
+    # 06: thiếu insurance khi CIF
+    if "T02-06" in chosen_codes:
+        presented["insurance_present"] = False
+
+    # 07: coverage <110% khi CIF
+    if "T02-07" in chosen_codes:
+        presented["insurance_present"] = True
+        presented["insurance_coverage_pct"] = int(rng.choice([100, 105, 108]))
+
+    # 08: late presentation
+    if "T02-08" in chosen_codes:
+        presented["documents_presented_within_days"] = int(rng.choice([22, 25, 30]))
+
+    # 09: thiếu C/O
+    if "T02-09" in chosen_codes:
+        presented["co_present"] = False
+
+    # 10: thiếu packing list
+    if "T02-10" in chosen_codes:
+        presented["packing_list_present"] = False
+
+    # --- L/C terms ---
+    lc_terms = {
+        "issue_date": issue_date,
+        "latest_ship": latest_ship,
+        "expiry_date": expiry_date,
+        "amount": amount,
+        "currency": "USD",
+        "tolerance_pct": tolerance,
+        "goods": goods,
+        "incoterm": incoterm,
+        "port_load": port_load,
+        "port_discharge": port_discharge,
+        "applicant": applicant,
+        "beneficiary": beneficiary,
+        "required_bl_originals": 3,             # cố định để rõ checking
+        "max_presentation_days": 21,            # thông lệ (bài tập)
+    }
+
+    params = {
+        "lc_terms": lc_terms,
+        "presented": presented,
+        "discrepancy_pool": DISCREPANCY_POOL,  # để render options đồng nhất
+    }
+
+    answers = {
+        "correct_codes": sorted(chosen_codes),
+    }
+
+    return params, answers
+
 def fetch_attempt(mssv: str, exercise_code: str, attempt_no: int):
     """Kiểm tra attempt đã nộp chưa."""
     if not supabase_client:
@@ -1090,6 +1299,272 @@ def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
         )
         st.rerun()
 
+def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code  = str(ex_code).strip().upper()
+    if ex_code != "T01":
+        return  # an toàn
+
+    # 1) Nếu attempt đã nộp -> khóa + hiện lại
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+        costs = (ans.get("costs") or {})
+
+        st.markdown("**Đề bài (từ DB):**")
+        st.write(f"- Invoice: **{params.get('amount_usd','-'):,} USD** | Kỳ hạn: **{params.get('tenor_days','-')} ngày**")
+        st.write(f"- Lãi suất cơ hội: **{float(params.get('opp_rate',0))*100:.2f}%/năm**")
+
+        st.markdown("**Đáp án chuẩn (để đối chiếu học tập):**")
+        st.success(
+            f"Phương án rẻ nhất: **{ans.get('best_method','-')}** | "
+            f"T/T={costs.get('TT','-')} | D/A={costs.get('DA','-')} | L/C={costs.get('LC','-')} (USD)"
+        )
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_T01(seed)
+
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài T01 — Tối ưu chi phí phương thức thanh toán</div>
+  <div class="mission-text">
+    So sánh tổng chi phí (USD) của 3 phương thức: <b>T/T</b>, <b>Nhờ thu D/A</b>, <b>L/C trả chậm</b>.
+    Chọn phương thức có <b>chi phí thấp nhất</b>.
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 3) Hiển thị dữ kiện
+    st.write(f"**Invoice:** {params['amount_usd']:,} USD")
+    st.write(f"**Kỳ hạn thanh toán:** {params['tenor_days']} ngày")
+    st.write(f"**Lãi suất cơ hội (cost of funds):** {params['opp_rate']*100:.2f}%/năm (360 ngày)")
+
+    st.markdown("#### 📌 Phí ngân hàng")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("**T/T**")
+        st.write(f"Fixed: {params['tt_fixed']:.0f} USD")
+        st.write(f"% fee: {params['tt_pct']*100:.2f}%")
+        st.caption("T/T trả ngay ⇒ có opportunity cost")
+    with col2:
+        st.markdown("**Nhờ thu (D/A)**")
+        st.write(f"Fixed: {params['da_fixed']:.0f} USD")
+        st.write(f"% fee: {params['da_pct']*100:.2f}%")
+        st.caption("Giả định trả cuối kỳ ⇒ không tính opp cost")
+    with col3:
+        st.markdown("**L/C trả chậm**")
+        st.write(f"Fixed: {params['lc_fixed']:.0f} USD")
+        st.write(f"Opening fee: {params['lc_pct_per_quarter']*100:.2f}% / quý × {params['quarters']} quý")
+        st.write(f"Ký quỹ: {params['lc_margin']*100:.0f}% (tính opp cost trên phần ký quỹ)")
+
+    st.markdown("---")
+
+    # 4) SV chọn đáp án
+    METHOD_LABELS = {
+        "TT": "T/T (chuyển tiền)",
+        "DA": "Nhờ thu D/A",
+        "LC": "L/C trả chậm",
+    }
+    pick = st.selectbox(
+        "✅ Chọn phương thức có chi phí thấp nhất:",
+        options=["TT", "DA", "LC"],
+        format_func=lambda k: METHOD_LABELS[k],
+        key=f"t01_pick_{attempt_no}"
+    )
+
+    # 5) Nộp bài
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_t01_{attempt_no}"):
+        is_ok = (pick == answers["best_method"])
+        score = 10 if is_ok else 0
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": "TRADE",
+            "exercise_code": ex_code,
+            "attempt_no": attempt_no,
+            "seed": int(seed),  # seed của bạn đã fix tránh overflow bigint rồi
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": bool(is_ok),
+            "score": int(score),
+            "duration_sec": None,
+            "note": f"T01 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+
+        c = answers["costs"]
+        st.info(
+            f"📌 Chi phí chuẩn (USD): T/T={c['TT']} | D/A={c['DA']} | L/C={c['LC']}  →  Rẻ nhất: **{answers['best_method']}**"
+        )
+        st.rerun()
+
+def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code  = str(ex_code).strip().upper()
+    if ex_code != "T02":
+        return
+
+    # 1) Nếu attempt đã nộp -> khóa + hiện lại
+    existing = fetch_attempt(mssv, ex_code, attempt_no)
+    if existing:
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
+        params = existing.get("params_json", {}) or {}
+        ans = existing.get("answer_json", {}) or {}
+
+        lc = (params.get("lc_terms") or {})
+        pr = (params.get("presented") or {})
+        pool = (params.get("discrepancy_pool") or [])
+
+        st.markdown("**Đề bài (từ DB):**")
+        st.write(f"- Beneficiary: **{lc.get('beneficiary','-')}** | Applicant: **{lc.get('applicant','-')}**")
+        st.write(f"- Amount: **{lc.get('amount','-'):,} {lc.get('currency','')}** | Tolerance: **±{lc.get('tolerance_pct','-')}%**")
+        st.write(f"- Latest shipment: **{lc.get('latest_ship','-')}** | Max presentation: **{lc.get('max_presentation_days','-')} ngày**")
+
+        st.markdown("**Đáp án chuẩn (codes):**")
+        st.success(", ".join(ans.get("correct_codes", [])) or "(Không có)")
+
+        # (Tuỳ chọn) hiển thị mô tả
+        mp = {c: d for c, d in pool}
+        if ans.get("correct_codes"):
+            st.markdown("**Mô tả sai biệt:**")
+            for c in ans["correct_codes"]:
+                st.write(f"- **{c}**: {mp.get(c,'')}")
+        return
+
+    # 2) Sinh đề theo seed ổn định
+    seed = stable_seed(mssv, ex_code, attempt_no)
+    params, answers = gen_case_T02(seed)
+
+    lc = params["lc_terms"]
+    pr = params["presented"]
+    pool = params["discrepancy_pool"]
+
+    st.markdown(
+        """
+<div class="role-card">
+  <div class="role-title">📝 Bài T02 — Checking chứng từ theo L/C</div>
+  <div class="mission-text">
+    Bạn là chuyên viên TTQT. Hãy kiểm tra bộ chứng từ xuất trình so với L/C terms và chọn các <b>sai biệt</b> (discrepancies).
+  </div>
+</div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 3) Hiển thị L/C terms
+    with st.expander("📄 L/C Terms", expanded=True):
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write(f"**Beneficiary:** {lc['beneficiary']}")
+            st.write(f"**Applicant:** {lc['applicant']}")
+            st.write(f"**Amount:** {lc['amount']:,} {lc['currency']} (±{lc['tolerance_pct']}%)")
+            st.write(f"**Goods:** {lc['goods']}")
+            st.write(f"**Incoterm:** {lc['incoterm']}")
+        with c2:
+            st.write(f"**Port of Loading:** {lc['port_load']}")
+            st.write(f"**Port of Discharge:** {lc['port_discharge']}")
+            st.write(f"**Latest shipment date:** {lc['latest_ship']}")
+            st.write(f"**Expiry date:** {lc['expiry_date']}")
+            st.write(f"**B/L originals required:** {lc['required_bl_originals']}")
+            st.write(f"**Max presentation days:** {lc['max_presentation_days']}")
+
+    # 4) Hiển thị chứng từ xuất trình
+    with st.expander("🧾 Bộ chứng từ xuất trình", expanded=True):
+        st.markdown("**Commercial Invoice**")
+        st.write(f"- Amount: **{pr['invoice_amount']:,} {pr['invoice_currency']}**")
+        st.write(f"- Goods: **{pr['invoice_goods_desc']}**")
+        st.write(f"- Incoterm: **{pr['invoice_incoterm']}**")
+
+        st.markdown("**Bill of Lading (B/L)**")
+        st.write(f"- Shipped on board: **{'Yes' if pr['bl_shipped_on_board'] else 'No'}**")
+        st.write(f"- Ship date: **{pr['bl_ship_date']}**")
+        st.write(f"- POL: **{pr['bl_port_load']}**")
+        st.write(f"- POD: **{pr['bl_port_discharge']}**")
+        st.write(f"- Originals: **{pr['bl_originals']}**")
+
+        st.markdown("**Insurance**")
+        st.write(f"- Presented: **{'Yes' if pr['insurance_present'] else 'No'}**")
+        st.write(f"- Coverage: **{pr['insurance_coverage_pct']}%**")
+        st.write(f"- Currency: **{pr['insurance_currency']}**")
+
+        st.markdown("**Other docs**")
+        st.write(f"- C/O presented: **{'Yes' if pr['co_present'] else 'No'}**")
+        st.write(f"- Packing List presented: **{'Yes' if pr['packing_list_present'] else 'No'}**")
+        st.write(f"- Presented within: **{pr['documents_presented_within_days']} days**")
+
+    st.markdown("---")
+
+    # 5) SV chọn sai biệt
+    options = [f"{code} — {desc}" for code, desc in pool]
+    option_codes = [code for code, _ in pool]
+
+    picked = st.multiselect(
+        "✅ Chọn các sai biệt (discrepancies) bạn phát hiện:",
+        options=options,
+        default=[],
+        key=f"t02_pick_{attempt_no}",
+    )
+
+    picked_codes = []
+    for x in picked:
+        # lấy code phía trước "—"
+        c = x.split("—")[0].strip()
+        if c in option_codes:
+            picked_codes.append(c)
+    picked_codes = sorted(set(picked_codes))
+
+    # 6) Nộp bài
+    if st.button("📩 NỘP BÀI (Submit)", type="primary", use_container_width=True, key=f"btn_submit_t02_{attempt_no}"):
+        correct = sorted(answers["correct_codes"])
+        is_ok = (picked_codes == correct)
+        score = 10 if is_ok else 0
+
+        payload = {
+            "mssv": mssv,
+            "hoten": get_student_name(mssv) or None,
+            "lop": None,
+            "room": "TRADE",
+            "exercise_code": ex_code,
+            "attempt_no": attempt_no,
+            "seed": int(seed),
+            "params_json": params,
+            "answer_json": answers,
+            "is_correct": bool(is_ok),
+            "score": int(score),
+            "duration_sec": None,
+            "note": f"T02 attempt {attempt_no}",
+        }
+
+        ok = insert_attempt(payload)
+        if not ok:
+            st.stop()
+
+        if is_ok:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
+            st.info(f"📌 Đáp án chuẩn: **{', '.join(correct) if correct else '(Không có)'}**")
+
+        st.rerun()
+
+
 # =========================================================
 # EXERCISE ROUTER MAP: (ROOM, EX_CODE) -> render_function
 # Mỗi render_function phải có chữ ký: fn(mssv: str, ex_code: str, attempt_no: int)
@@ -1100,7 +1575,8 @@ EX_RENDERERS = {
     ("DEALING", "D02"): render_exercise_D02,    
     ("RISK", "R01"): render_exercise_R01,
     ("RISK", "R02"): render_exercise_R02,
-    # ("TRADE", "T01"): render_exercise_T01,
+    ("TRADE", "T01"): render_exercise_T01,
+    ("TRADE", "T02"): render_exercise_T02,
     # ("INVEST", "I01"): render_exercise_I01,
     # ("MACRO", "M01"): render_exercise_M01,
 }

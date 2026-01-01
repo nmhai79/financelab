@@ -754,9 +754,12 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.rerun()
 
-def render_exercise_R01(mssv: str, ex_code: str, attempt_no: int):
-    room_key = "RISK"
-    if ex_code != "R01":
+def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
+    room_key = str(room_key).strip().upper()
+    ex_code = str(ex_code).strip().upper()
+
+    # Guard an toàn: chỉ chạy đúng bài R01 của phòng RISK
+    if room_key != "RISK" or ex_code != "R01":
         return
 
     # 1) nếu attempt đã nộp -> khóa, show lại đề + đáp án từ DB
@@ -3554,7 +3557,7 @@ def room_6_leaderboard():
             else:
                 st.success(f"📌 Vị trí của bạn ({mssv}): **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
         else:
-            st.info("Bạn chưa có dữ liệu xếp hạng cho cá nhân vì chưa nộp bài tập.")
+            st.info("Bạn không có dữ liệu xếp hạng cho cá nhân vì chưa nộp bài tập.")
 
         # QUAY THƯỞNG NGẪU NHIÊN
         st.markdown("---")

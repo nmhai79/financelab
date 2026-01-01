@@ -3277,7 +3277,7 @@ def room_6_leaderboard():
 
         if not data:
             st.warning("Chưa có dữ liệu xếp hạng. Lớp chưa nộp bài nào.")
-            st.stop()
+            return
 
         df = pd.DataFrame(data)
 
@@ -3375,6 +3375,7 @@ def room_6_leaderboard():
         else:
             st.info("Bạn chưa có dữ liệu xếp hạng (chưa nộp bài hoặc chưa đồng bộ).")
 
+        # QUAY THƯỞNG NGẪU NHIÊN
         st.markdown("---")
         st.subheader("🎁 Quay thưởng ngẫu nhiên (Lucky Draw)")
 

@@ -2498,14 +2498,15 @@ def fetch_class_leaderboard_from_view(limit: int = 200):
         return None
     try:
         res = (
-            supabase_client.from_("lab_leaderboard")
+            supabase_client.table("lab_leaderboard")
             .select("mssv,hoten,lop,total_score,num_solved_ex,num_exercises,last_submit")
             .order("total_score", desc=True)
             .limit(limit)
             .execute()
         )
         return res.data or []
-    except Exception:
+    except Exception as e:
+        st.warning(f"⚠️ Không đọc được VIEW lab_leaderboard: {e}")
         return None
 
 def compute_class_leaderboard_fallback(limit: int = 200):

@@ -1285,6 +1285,26 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem; }
   .stDataFrame, .stTable { overflow-x: auto; }
 }
 
+/* =============================
+   Sidebar NAV buttons (mobile wrap fix)
+   ============================= */
+section[data-testid="stSidebar"] div[data-testid="stButton"] > button{
+  white-space: normal !important;      /* cho phép xuống dòng */
+  text-align: center !important;       /* canh giữa */
+  line-height: 1.15 !important;        /* đẹp khi 2 dòng */
+  padding: 12px 12px !important;
+  min-height: 56px !important;         /* tránh bị rớt lẻ */
+}
+
+/* Mobile nhỏ: tăng min-height + giảm font chút */
+@media (max-width: 430px){
+  section[data-testid="stSidebar"] div[data-testid="stButton"] > button{
+    font-size: 16px !important;
+    min-height: 68px !important;       /* đủ chỗ cho 2 dòng */
+    padding: 12px 10px !important;
+  }
+}
+
 /* Footer */
 .copyright {
     font-size: 12px;
@@ -3353,7 +3373,7 @@ def render_practice_router():
     ex_code = str(st.session_state.get("ACTIVE_EX_CODE", "D01")).strip().upper()
     attempt_no = int(st.session_state.get("ACTIVE_ATTEMPT", 1))
 
-    st.markdown("### 🧩 Khu vực làm bài (Workspace)")
+    st.markdown("### 🧩 Khu vực làm bài")
 
     # Guard: chưa login
     if not mssv:
@@ -3777,7 +3797,7 @@ def room_6_leaderboard():
 
         # QUAY THƯỞNG NGẪU NHIÊN
         st.markdown("---")
-        st.subheader("🎁 Quay thưởng ngẫu nhiên (Lucky Draw)")
+        st.subheader("🎁 Quay thưởng ngẫu nhiên")
 
         cA, cB, cC = st.columns([1.2, 1.2, 2.0])
         with cA:

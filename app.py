@@ -3175,8 +3175,7 @@ def room_6_leaderboard():
 
         rows = fetch_my_attempts(mssv)
         if not rows:
-            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")
-            return
+            st.info("Chưa có dữ liệu bài nộp. Hãy vào tab **🎯 Làm bài tập** để bắt đầu.")            
 
         df = pd.DataFrame(rows)
         # chuẩn hóa
@@ -3282,6 +3281,7 @@ def room_6_leaderboard():
         df = pd.DataFrame(data)
         st.caption(f"DEBUG: rows={len(df)}")
 
+
         # Chuẩn hóa vài cột phổ biến (view/fallback có thể khác nhau)
         # ưu tiên các cột: mssv, hoten, total_score, total_correct, exercises_done, last_submit
         if "mssv" in df.columns:
@@ -3334,7 +3334,7 @@ def room_6_leaderboard():
 
 
         # Bộ lọc/search
-        c1, c2 = st.columns([2, 1])
+        c1, c2, c3 = st.columns([2, 1, 1])
         with c1:
             kw = st.text_input("🔎 Tìm theo MSSV / Họ tên", value="", key=f"lb_search_{mssv}")
         with c2:
@@ -3528,6 +3528,5 @@ if handler is None:
     st.rerun()
 
 handler()
-
 
 

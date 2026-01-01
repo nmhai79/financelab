@@ -2490,16 +2490,12 @@ def fetch_my_attempts(mssv: str, limit: int = 2000):
         return []
 
 def fetch_class_leaderboard_from_view(limit: int = 200):
-    """
-    Ưu tiên đọc VIEW 'lab_leaderboard' (best-of-3).
-    Nếu view chưa tồn tại / lỗi, trả về None để fallback.
-    """
     if not supabase_client:
         return None
     try:
         res = (
             supabase_client.table("lab_leaderboard")
-            .select("mssv,hoten,lop,total_score,num_solved_ex,num_exercises,last_submit")
+            .select("mssv,hoten,lop,total_score,num_solved_exercises,num_exercises_attempted")
             .order("total_score", desc=True)
             .limit(limit)
             .execute()
@@ -2508,6 +2504,7 @@ def fetch_class_leaderboard_from_view(limit: int = 200):
     except Exception as e:
         st.warning(f"⚠️ Không đọc được VIEW lab_leaderboard: {e}")
         return None
+
 
 def compute_class_leaderboard_fallback(limit: int = 200):
     """
@@ -3033,31 +3030,33 @@ def room_6_leaderboard():
 
         # =========================
         # Chuẩn hoá các cột từ VIEW lab_leaderboard
-        # VIEW có: total_score, num_solved_ex, num_exercises
+        # VIEW có: total_score, num_solved_exercises, num_exercises_attempted
         # App muốn dùng: total_score, total_correct, exercises_done
         # =========================
 
-        # 1) total_score
+        # total_score
         if "total_score" not in df.columns and "total" in df.columns:
             df["total_score"] = df["total"]
         if "total_score" not in df.columns:
             df["total_score"] = 0
 
-        # 2) Map đúng/số mã bài từ view (ƯU TIÊN num_* nếu có)
-        if "num_solved_ex" in df.columns:
-            df["total_correct"] = df["num_solved_ex"]
+        # ✅ Ưu tiên cột đúng từ view
+        if "num_solved_exercises" in df.columns:
+            df["total_correct"] = df["num_solved_exercises"]
         elif "total_correct" not in df.columns:
             df["total_correct"] = 0
 
-        if "num_exercises" in df.columns:
-            df["exercises_done"] = df["num_exercises"]
+        if "num_exercises_attempted" in df.columns:
+            df["exercises_done"] = df["num_exercises_attempted"]
         elif "exercises_done" not in df.columns:
             df["exercises_done"] = 0
 
-        # 3) Ép kiểu số
-        df["total_score"] = pd.to_numeric(df["total_score"], errors="coerce").fillna(0).astype(int)
-        df["total_correct"] = pd.to_numeric(df["total_correct"], errors="coerce").fillna(0).astype(int)
-        df["exercises_done"] = pd.to_numeric(df["exercises_done"], errors="coerce").fillna(0).astype(int)
+        # ép kiểu số
+        for col in ["total_score", "total_correct", "exercises_done"]:
+            if col not in df.columns:
+                df[col] = 0
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
+
 
         # 4) Sort + Rank
         sort_cols = ["total_score", "total_correct", "exercises_done"]

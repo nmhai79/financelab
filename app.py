@@ -3000,7 +3000,7 @@ def room_6_leaderboard():
 <div class="role-card">
   <div class="role-title">👤 Vai diễn: Sinh viên – Nhà vô địch Lab</div>
   <div class="mission-text">
-  "Nhiệm vụ: Hoàn thành các bài tập nghiệp vụ, tích lũy điểm số và cạnh tranh thứ hạng cá nhân & toàn lớp."
+  "Nhiệm vụ: Hoàn thành các bài tập nghiệp vụ, tích lũy điểm số và cạnh tranh thứ hạng toàn lớp."
   </div>
 </div>
         """,
@@ -3287,7 +3287,7 @@ def room_6_leaderboard():
             st.warning("Chưa có dữ liệu xếp hạng. Lớp chưa nộp bài nào.")
             return
 
-        df = pd.DataFrame(data)    
+        df = pd.DataFrame(data)  
 
         # Chuẩn hóa vài cột phổ biến (view/fallback có thể khác nhau)
         # ưu tiên các cột: mssv, hoten, total_score, total_correct, exercises_done, last_submit
@@ -3393,7 +3393,7 @@ def room_6_leaderboard():
             else:
                 st.success(f"📌 Vị trí của bạn ({mssv}): **#{r}** | Điểm: **{sc}** | Đúng: **{cr}** | Mã bài: **{exd}**")
         else:
-            st.info("Bạn chưa có dữ liệu xếp hạng (chưa nộp bài hoặc chưa đồng bộ).")
+            st.info("Bạn chưa có dữ liệu xếp hạng cho cá nhân vì chưa nộp bài tập.")
 
         # QUAY THƯỞNG NGẪU NHIÊN
         st.markdown("---")
@@ -3535,6 +3535,5 @@ if handler is None:
     st.rerun()
 
 handler()
-
 
 

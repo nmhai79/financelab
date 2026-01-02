@@ -5069,6 +5069,70 @@ def render_my_badges(df: "pd.DataFrame"):
               .room-title{ font-size: 16px; }
               .j-label{ font-size: 12px; }
             }
+
+            /* ===== Journey Pills (Duolingo style) ===== */
+            .jp-wrap{
+            margin: 10px 0 14px 0;
+            padding: 12px 12px;
+            border-radius: 16px;
+            border: 1px solid rgba(148,163,184,.35);
+            background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,250,252,.94));
+            box-shadow: 0 10px 22px rgba(15,23,42,.08);
+            }
+            .jp-title{
+            font-weight: 900; color:#0f172a; margin-bottom: 10px;
+            display:flex; justify-content:space-between; align-items:center; gap:10px;
+            }
+            .jp-row{
+            display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+            }
+            .jp-pill{
+            flex: 1 1 120px;
+            min-width: 92px;
+            height: 38px;
+            border-radius: 999px;
+            border: 1px solid rgba(148,163,184,.35);
+            background: rgba(148,163,184,.18);
+            position: relative;
+            overflow:hidden;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+            display:flex; align-items:center; justify-content:center;
+            font-weight: 900;
+            color:#0f172a;
+            user-select:none;
+            }
+            .jp-pill .jp-fill{
+            position:absolute; inset:0;
+            width: 0%;
+            background: rgba(59,130,246,.82);
+            }
+            .jp-pill .jp-text{
+            position:relative;
+            z-index:2;
+            font-size: 13px;
+            text-shadow: 0 1px 0 rgba(255,255,255,.65);
+            display:flex; gap:8px; align-items:center;
+            }
+            .jp-pill .jp-ico{ font-size: 16px; line-height:1; }
+
+            /* states by completion */
+            .jp-0 .jp-fill{ width:0%; background: rgba(148,163,184,.18); }
+            .jp-1 .jp-fill{ width:55%; background: rgba(59,130,246,.65); }
+            .jp-2 .jp-fill{ width:100%; background: rgba(34,197,94,.80); }
+            .jp-2{ border-color: rgba(34,197,94,.45); }
+            .jp-2 .jp-text{ color:#052e16; }
+
+            /* tooltip */
+            .jp-pill[title]{ cursor: help; }
+
+            /* Mobile: icon-only pills */
+            @media (max-width: 768px){
+            .jp-title{ font-size: 14px; }
+            .jp-pill{ flex: 1 1 18%; min-width: 56px; height: 40px; }
+            .jp-pill .jp-text{ font-size: 0px; }   /* hide text */
+            .jp-pill .jp-ico{ font-size: 18px; }   /* show icon */
+            .jp-pill .jp-count{ font-size: 0px; }  /* hide count */
+            }
             </style>
             """
         ),
@@ -5115,37 +5179,65 @@ def render_my_badges(df: "pd.DataFrame"):
     st.session_state[cache_key] = dict(prog)
 
     # =========================
-    # 4) Progress Journey (5 phòng)  ✅ FIX: không bị in HTML như code nữa
+    # 4) Journey Pills (5 phòng) — mobile-friendly
     # =========================
     def _room_badge_done_count(room_key: str) -> tuple[int, int]:
         items = BADGE_CATALOG[room_key]["items"]
         done = sum(1 for it in items if int(prog.get(it["code"].strip().upper(), 0)) >= 3)
         return done, len(items)
 
-    steps = []
+    # icon map (đồng bộ với menu)
+    ROOM_ICON = {
+        "DEALING": "💱",
+        "RISK": "🛡️",
+        "TRADE": "🚢",
+        "INVEST": "🏭",
+        "MACRO": "📉",
+    }
+
+    pills_html = []
     for rk in BADGE_ORDER:
         done, total = _room_badge_done_count(rk)
-        ratio = 0 if total == 0 else int(done / total * 100)
-        cls_done = "j-done" if done == total and total > 0 else ""
-        # label gọn: bỏ emoji đầu
-        label = BADGE_CATALOG[rk]["title"].split(" ", 1)[-1]
-        steps.append(
-            f'<div class="j-step {cls_done}">'
-            f'  <div class="j-fill" style="width:{ratio}%"></div>'
-            f'  <div class="j-label">{label} · {done}/{total}</div>'
-            f"</div>"
+        # trạng thái 0/1/2 (vì mỗi phòng 2 badge)
+        state = min(max(done, 0), total)  # 0..2
+        cls = f"jp-{state}"               # jp-0 / jp-1 / jp-2
+
+        # label ngắn gọn
+        full_title = BADGE_CATALOG[rk]["title"]
+        # tooltip đầy đủ cho cả PC + mobile
+        tip = f"{full_title} • {done}/{total} huy hiệu"
+
+        ico = ROOM_ICON.get(rk, "🏁")
+        pills_html.append(
+            f"""
+            <div class="jp-pill {cls}" title="{tip}">
+            <div class="jp-fill"></div>
+            <div class="jp-text">
+                <span class="jp-ico">{ico}</span>
+                <span class="jp-name">{rk}</span>
+                <span class="jp-count">{done}/{total}</span>
+            </div>
+            </div>
+            """
         )
 
-    journey_html = (
-        '<div class="journey-wrap">'
-        '  <div class="journey-title">'
-        '    <div>🧭 Hành trình nghiệp vụ</div>'
-        '    <div style="font-weight:900; color:#334155; font-size:13px;">Hoàn tất phòng = đạt đủ 2 huy hiệu</div>'
-        "  </div>"
-        f'  <div class="journey-bar">{"".join(steps)}</div>'
-        "</div>"
+    st.markdown(
+        f"""
+        <div class="jp-wrap">
+        <div class="jp-title">
+            <div>🧭 Hành trình nghiệp vụ</div>
+            <div style="font-weight:900; color:#334155; font-size:13px;">
+            Hoàn tất phòng = đạt đủ 2 huy hiệu
+            </div>
+        </div>
+        <div class="jp-row">
+            {''.join(pills_html)}
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
-    st.markdown(journey_html, unsafe_allow_html=True)
+
 
     # =========================
     # 5) Render cards + badges

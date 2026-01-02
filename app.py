@@ -1014,8 +1014,17 @@ def render_exercise_D01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
-        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
 
@@ -1111,8 +1120,7 @@ def render_exercise_D01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            # ✅ không st.stop() để không chặn tab khác
-            st.error("Không ghi được bài nộp. Vui lòng thử lại.")
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
             return
 
         if is_ok:
@@ -1123,8 +1131,15 @@ def render_exercise_D01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
         st.info(
             f"📌 Đáp án chuẩn: EUR/VND = **{answers['cross_bid']:,.0f} - {answers['cross_ask']:,.0f}** | Spread = **{answers['spread']:,.0f}**"
         )
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# BÀI D02: XỬ LÝ GIAO DỊCH NGOẠI HỐI
 def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code = str(ex_code).strip().upper()
@@ -1133,8 +1148,17 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp rồi -> khóa và hiện lại đề + đáp án
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
-        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
 
@@ -1262,7 +1286,8 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
@@ -1273,7 +1298,15 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
                 f"(Cross implied tham khảo: {answers['implied_bid']:,.0f} – {answers['implied_ask']:,.0f})"
             )
 
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
+
+# BÀI R01: TỶ GIÁ KỲ HẠN VÀ HEDGE FORWARD CHO KHOẢN NỢ USD
 
 def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
@@ -1285,8 +1318,17 @@ def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) nếu attempt đã nộp -> khóa, show lại đề + đáp án từ DB
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
-        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
 
@@ -1383,7 +1425,8 @@ def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
@@ -1394,8 +1437,15 @@ def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             f"📌 Đáp án chuẩn: Forward USD/VND = **{answers['fwd_bid']:,.0f} / {answers['fwd_ask']:,.0f}**  |  "
             f"Chi phí hedge = **{answers['hedged_cost_vnd']:,.0f} VND**"
         )
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# R02: FORWARD VS OPTION (PREMIUM & BREAK-EVEN)
 def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code = str(ex_code).strip().upper()
@@ -1406,8 +1456,17 @@ def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa và hiển thị lại từ DB
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
-        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi. (Mỗi lần làm chỉ nộp 1 lần)")
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
+        st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
 
@@ -1526,7 +1585,8 @@ def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
@@ -1538,8 +1598,15 @@ def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             f"Option = **{answers['option_cost']:,.0f} VND** | "
             f"Chọn: **{answers['best_choice']}**"
         )
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# BÀI T01: TỐI ƯU CHI PHÍ PHƯƠNG THỨC THANH TOÁN QUỐC TẾ
 def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code  = str(ex_code).strip().upper()
@@ -1548,7 +1615,16 @@ def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa + hiện lại
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -1643,7 +1719,8 @@ def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
@@ -1654,8 +1731,15 @@ def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
         st.info(
             f"📌 Chi phí chuẩn (USD): T/T={c['TT']} | D/A={c['DA']} | L/C={c['LC']}  →  Rẻ nhất: **{answers['best_method']}**"
         )
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# T02
 def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code  = str(ex_code).strip().upper()
@@ -1664,7 +1748,16 @@ def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa + hiện lại
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -1795,7 +1888,8 @@ def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
@@ -1803,8 +1897,15 @@ def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
             st.info(f"📌 Đáp án chuẩn: **{', '.join(correct) if correct else '(Không có)'}**")
 
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# BÀI I01: THẨM ĐỊNH DỰ ÁN FDI - NPV & QUYẾT ĐỊNH
 def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code  = str(ex_code).strip().upper()
@@ -1813,7 +1914,16 @@ def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa và hiện lại đề + đáp án
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -1915,7 +2025,8 @@ def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         # Feedback
         if is_ok:
@@ -1925,8 +2036,15 @@ def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             dec_vn = "Chấp nhận" if answers["decision"] == "ACCEPT" else "Từ chối"
             st.info(f"📌 Đáp án chuẩn: NPV = **{answers['npv']:,.0f} USD** | Quyết định: **{dec_vn}**")
 
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# I02
 def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code  = str(ex_code).strip().upper()
@@ -1935,7 +2053,16 @@ def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa, hiện lại đề + đáp án
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -2037,7 +2164,8 @@ def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
-            st.stop()
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
+            return
 
         if is_ok:
             st.success("✅ CHÍNH XÁC! Bạn được **+10 điểm**.")
@@ -2046,8 +2174,15 @@ def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             dec_vn = "Chấp nhận" if answers["decision"] == "ACCEPT" else "Từ chối"
             st.info(f"📌 Đáp án chuẩn: IRR = **{answers['irr_pct']}%** | Quyết định: **{dec_vn}**")
 
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# M01
 def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code = str(ex_code).strip().upper()
@@ -2058,7 +2193,16 @@ def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp -> khóa, hiển thị lại đề + đáp án
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -2161,6 +2305,7 @@ def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
             return
 
         if is_ok:
@@ -2174,8 +2319,15 @@ def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             f"📌 Đáp án: Tỷ giá mới **{answers['new_rate']:,.0f}** | "
             f"Tăng thêm **{answers['increase_tril']} nghìn tỷ VND**"
         )
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_ok": bool(is_ok),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
 
+# M02
 def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int):
     room_key = str(room_key).strip().upper()
     ex_code = str(ex_code).strip().upper()
@@ -2186,7 +2338,16 @@ def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
     # 1) Nếu attempt đã nộp rồi -> khóa, hiển thị lại đề + đáp án
     existing = fetch_attempt(mssv, ex_code, attempt_no)
+    # ✅ Hiện kết quả chấm nếu attempt đã nộp
     if existing:
+        score = int(existing.get("score", 0) or 0)
+        is_correct = bool(existing.get("is_correct", False))
+
+        st.markdown("### 📌 Kết quả lần nộp này")
+        (st.success if is_correct else st.error)(
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+        )
+
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
         params = existing.get("params_json", {}) or {}
         ans = existing.get("answer_json", {}) or {}
@@ -2288,13 +2449,13 @@ def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
         ok_open = abs(int(in_vnd_open) - int(answers["vnd_open"])) <= TOL_OPEN
         ok_pl = abs(int(in_pl_vnd) - int(answers["pl_vnd"])) <= TOL_PL
         ok_mc = (str(in_mc).strip().upper() == ("YES" if answers["margin_call"] else "NO"))
+        is_correct = bool(ok_open and ok_pl and ok_mc)
 
         score = 0
         score += W_OPEN if ok_open else 0
         score += W_PL if ok_pl else 0
         score += W_MC if ok_mc else 0
-
-        is_correct = bool(score == 10)
+       
         duration_sec = int(time.time() - st.session_state.get(start_key, time.time()))
 
         payload = {
@@ -2319,7 +2480,15 @@ def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         ok = insert_attempt(payload)
         if not ok:
+            st.error("⚠️ Không ghi được bài nộp (lỗi hệ thống/DB). Vui lòng thử lại sau 10–20 giây hoặc báo GV.")
             return
+        
+        if is_correct:
+            st.success(f"✅ CHÍNH XÁC! Bạn được **+{score} điểm**.")
+        elif score > 0:
+            st.warning(f"🟡 GẦN ĐÚNG! Bạn được **+{score} điểm** (đúng 1 phần).")
+        else:
+            st.error("❌ CHƯA ĐÚNG. Bạn được **0 điểm**.")
 
         # Feedback theo từng ý
         st.markdown("### ✅ Kết quả chấm")
@@ -2335,7 +2504,14 @@ def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
             f"Margin call **{mc_ans}**"
         )
 
+        # ✅ Lưu kết quả để sau rerun vẫn hiện
+        st.session_state[f"LAST_GRADE_{ex_code}_{attempt_no}"] = {
+            "is_correct": bool(is_correct),
+            "score": int(score),
+            "attempt_no": int(attempt_no),
+        }
         st.rerun()
+
 
 #====== KẾT THÚC ĐỊNH NGHĨA HÀM RENDER CHO CÁC BÀI TẬP ======#
 
@@ -5236,8 +5412,7 @@ def room_6_leaderboard():
             df["score"] = pd.to_numeric(df["score"], errors="coerce").fillna(0).astype(int)
             df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
             df["is_correct"] = df["is_correct"].astype(bool)
-
-            st.markdown("---")
+           
             # Sau khi đã có df (lịch sử nộp bài của SV)
             render_my_badges(df)
             st.markdown("---")

@@ -4641,6 +4641,152 @@ def render_practice_router():
     fn(mssv, room_key, ex_code, attempt_no)
 
 
+# ==============================================================================
+# BADGES: Chuyên cần 3/3 theo từng mã bài
+# ==============================================================================
+
+BADGE_CATALOG = {
+    "DEALING": {
+        "title": "💱 Sàn Kinh doanh Ngoại hối",
+        "items": [
+            {"code": "D01", "icon": "🧮", "name": "Niêm yết Tỷ giá Chéo"},
+            {"code": "D02", "icon": "🔺", "name": "Săn Arbitrage Tam giác"},
+        ],
+    },
+    "RISK": {
+        "title": "🛡️ Phòng Quản trị Rủi ro",
+        "items": [
+            {"code": "R01", "icon": "🛡️", "name": "Phòng vệ Forward"},
+            {"code": "R02", "icon": "🎯", "name": "Chọn Hedge Tối ưu"},
+        ],
+    },
+    "TRADE": {
+        "title": "🚢 Phòng Thanh toán Quốc tế",
+        "items": [
+            {"code": "T01", "icon": "💰", "name": "Tối ưu Chi phí Thanh toán"},
+            {"code": "T02", "icon": "🧾", "name": "Soi Sai Biệt Chứng từ"},
+        ],
+    },
+    "INVEST": {
+        "title": "🏭 Phòng Đầu tư Quốc tế",
+        "items": [
+            {"code": "I01", "icon": "📈", "name": "Thẩm định NPV"},
+            {"code": "I02", "icon": "⚖️", "name": "IRR vs WACC"},
+        ],
+    },
+    "MACRO": {
+        "title": "📉 Ban Chiến lược Vĩ mô",
+        "items": [
+            {"code": "M01", "icon": "🌍", "name": "Cú sốc Tỷ giá & Nợ công"},
+            {"code": "M02", "icon": "💸", "name": "Carry Trade Unwind"},
+        ],
+    },
+}
+
+BADGE_ORDER = ["DEALING", "RISK", "TRADE", "INVEST", "MACRO"]
+
+
+def _badge_progress_map(df_attempts: "pd.DataFrame") -> dict:
+    """
+    Trả về dict: {exercise_code: attempts_done_distinct}
+    attempts_done_distinct = số attempt_no khác nhau đã nộp (tối đa 3).
+    """
+    if df_attempts is None or df_attempts.empty:
+        return {}
+
+    if "exercise_code" not in df_attempts.columns or "attempt_no" not in df_attempts.columns:
+        return {}
+
+    tmp = df_attempts.copy()
+    tmp["exercise_code"] = tmp["exercise_code"].astype(str).str.strip().str.upper()
+    tmp["attempt_no"] = pd.to_numeric(tmp["attempt_no"], errors="coerce").fillna(0).astype(int)
+
+    # đếm số attempt khác nhau theo mã bài
+    g = tmp.groupby("exercise_code")["attempt_no"].nunique()
+    # cap tối đa 3
+    return {k: int(min(v, 3)) for k, v in g.to_dict().items()}
+
+
+def render_my_badges(df_attempts: "pd.DataFrame"):
+    """
+    Render 5 cards (mỗi phòng 2 huy hiệu), badge đạt khi attempts_done >= 3.
+    """
+    st.subheader("🎖️ Huy hiệu chuyên cần")
+    st.caption("Mỗi huy hiệu đạt khi bạn làm đủ **3 lần** cho **mỗi mã bài** (Attempt 1–2–3).")
+
+    prog = _badge_progress_map(df_attempts)
+
+    # CSS nhẹ cho dòng huy hiệu (không phá CSS tổng)
+    st.markdown(
+        """
+<style>
+.badge-line{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:10px; padding:10px 10px; border-radius:12px;
+  background:#ffffff; border:1px solid #e5e7eb;
+  margin:8px 0;
+}
+.badge-left{ display:flex; align-items:center; gap:10px; }
+.badge-name{ font-weight:800; color:#111827; }
+.badge-code{ font-size:12px; color:#6b7280; margin-left:8px; }
+.badge-right{ font-weight:900; }
+.badge-done{ color:#16a34a; }  /* xanh */
+.badge-todo{ color:#f59e0b; }  /* vàng */
+</style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # 5 phòng -> render theo grid 2 cột (mobile sẽ tự stack nhờ CSS của bạn)
+    pairs = [(BADGE_ORDER[i], BADGE_ORDER[i + 1]) for i in range(0, len(BADGE_ORDER) - 1, 2)]
+    if len(BADGE_ORDER) % 2 == 1:
+        pairs.append((BADGE_ORDER[-1], None))
+
+    for left_key, right_key in pairs:
+        colL, colR = st.columns(2)
+
+        def _render_room_card(room_key: str, container):
+            if not room_key:
+                return
+            room = BADGE_CATALOG.get(room_key)
+            if not room:
+                return
+
+            with container:
+                st.markdown(
+                    f"""
+<div class="role-card">
+  <div class="role-title">{room["title"]}</div>
+</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # render 2 badge lines
+                for it in room["items"]:
+                    code = it["code"].strip().upper()
+                    done = int(prog.get(code, 0))
+                    is_done = done >= 3
+                    status = "✅" if is_done else "⏳"
+                    status_cls = "badge-done" if is_done else "badge-todo"
+                    st.markdown(
+                        f"""
+<div class="badge-line">
+  <div class="badge-left">
+    <div style="font-size:22px; line-height:1">{it["icon"]}</div>
+    <div>
+      <span class="badge-name">{it["name"]}</span>
+      <span class="badge-code">({code})</span>
+    </div>
+  </div>
+  <div class="badge-right {status_cls}">{status} {done}/3</div>
+</div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+        _render_room_card(left_key, colL)
+        _render_room_card(right_key, colR)
 
 
 # ======= PHÒNG 6 BẢNG VÀNG THÀNH TÍCH ========
@@ -4846,6 +4992,9 @@ def room_6_leaderboard():
             df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
             df["is_correct"] = df["is_correct"].astype(bool)
 
+            # Sau khi đã có df (lịch sử nộp bài của SV)
+            render_my_badges(df)
+
             # Best-of-3 theo từng bài
             per_ex = (
                 df.groupby("exercise_code", as_index=False)
@@ -4868,10 +5017,10 @@ def room_6_leaderboard():
             c1.metric("🎯 Tổng điểm (best-of-3)", f"{total_score}")
             c2.metric("✅ Số bài đúng", f"{total_correct}")
             c3.metric("📌 Số mã bài đã làm", f"{exercises_done}")
-            c4.metric("🧾 Tổng lượt nộp", f"{attempts_total}")
+            c4.metric("🧾 Tổng lượt nộp", f"{attempts_total}")            
 
             st.markdown("---")
-            st.subheader("📌 Điểm tốt nhất theo từng mã bài (Best-of-3)")
+            st.subheader("📌 Điểm tốt nhất theo từng mã bài (Best-of-3)")            
 
             show_ex = per_ex.rename(columns={
                 "exercise_code": "Mã bài",

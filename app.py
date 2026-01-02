@@ -1021,7 +1021,7 @@ def render_exercise_D01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1155,7 +1155,7 @@ def render_exercise_D02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1325,7 +1325,7 @@ def render_exercise_R01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1463,7 +1463,7 @@ def render_exercise_R02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1622,7 +1622,7 @@ def render_exercise_T01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1755,7 +1755,7 @@ def render_exercise_T02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -1921,7 +1921,7 @@ def render_exercise_I01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -2060,7 +2060,7 @@ def render_exercise_I02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -2200,7 +2200,7 @@ def render_exercise_M01(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")
@@ -2345,7 +2345,7 @@ def render_exercise_M02(mssv: str, room_key: str, ex_code: str, attempt_no: int)
 
         st.markdown("### 📌 Kết quả lần nộp này")
         (st.success if is_correct else st.error)(
-            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} — **{score} điểm** (Lần {attempt_no}/3)"
+            f"{'✅ Đúng' if is_correct else '❌ Chưa đúng'} - **{score} điểm** (Lần {attempt_no}/3)"
         )
 
         st.warning(f"🔒 Bạn đã nộp **{ex_code} – Lần {attempt_no}** rồi.")

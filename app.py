@@ -4709,15 +4709,15 @@ def _badge_progress_map(df_attempts: "pd.DataFrame") -> dict:
 
 def render_my_badges(df: "pd.DataFrame"):
     """
-    UI huy hiệu (10 mã) theo yêu cầu:
     - Progress Journey (5 phòng)
     - Mỗi phòng 1 card 3D, bên trong 2 badge
-    - Badge có progress bar (0–100%) theo số lần nộp (x/3)
-    - KHÔNG balloons / KHÔNG toast
-    - Chỉ "glow" đúng badge vừa đạt 3/3 (mỗi badge glow đúng 1 lần, tự tắt ở lần rerun kế tiếp)
+    - Badge có progress bar (0-100%) theo số lần nộp (x/3)
+    - Khi vừa đạt 3/3: chỉ GLOW đúng badge đó (không balloons, không toast)
+    - Fix lỗi HTML bị render thành code: dùng textwrap.dedent để bỏ indent
     """
     import pandas as pd
     import streamlit as st
+    from textwrap import dedent
 
     # =========================
     # 0) Catalog huy hiệu
@@ -4762,310 +4762,253 @@ def render_my_badges(df: "pd.DataFrame"):
         },
     }
 
+    all_codes = [it["code"] for rk in BADGE_ORDER for it in BADGE_CATALOG[rk]["items"]]
+    all_codes_u = [str(c).strip().upper() for c in all_codes]
+
     # =========================
-    # 1) CSS (3D card + badge progress + journey + glow-once)
+    # 1) CSS UI (3D card + badge progress + journey + glow)
     # =========================
     st.markdown(
-        """
-<style>
-/* ===== Journey ===== */
-.journey-wrap{
-  margin: 10px 0 14px 0;
-  padding: 12px 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(148,163,184,.35);
-  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,250,252,.94));
-  box-shadow: 0 10px 22px rgba(15,23,42,.08);
-}
-.journey-title{
-  font-weight: 900; color:#0f172a; margin-bottom: 10px;
-  display:flex; justify-content:space-between; align-items:center; gap:10px;
-}
-.journey-bar{
-  display:flex; gap: 10px; align-items:center;
-}
-.j-step{
-  flex:1;
-  border-radius: 14px;
-  border: 1px solid rgba(148,163,184,.35);
-  background: rgba(148,163,184,.18);
-  overflow:hidden;
-  height: 36px;
-  position: relative;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
-}
-.j-fill{
-  height:100%;
-  width:0%;
-  background: rgba(59,130,246,.82);
-}
-.j-label{
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
-  font-weight: 900; font-size: 13px;
-  color:#0f172a;
-  text-shadow: 0 1px 0 rgba(255,255,255,.65);
-}
-.j-done .j-fill{ background: rgba(34,197,94,.85); }
-.j-done .j-label{ color:#052e16; }
-.j-0 .j-label{ opacity:.85; }
+        dedent(
+            """
+            <style>
+            /* ===== Journey ===== */
+            .journey-wrap{
+              margin: 10px 0 14px 0;
+              padding: 12px 12px;
+              border-radius: 16px;
+              border: 1px solid rgba(148,163,184,.35);
+              background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,250,252,.94));
+              box-shadow: 0 10px 22px rgba(15,23,42,.08);
+            }
+            .journey-title{
+              font-weight: 900; color:#0f172a; margin-bottom: 10px;
+              display:flex; justify-content:space-between; align-items:center; gap:10px;
+            }
+            .journey-bar{ display:flex; gap: 10px; align-items:center; }
+            .j-step{
+              flex:1; height: 36px; position: relative; overflow:hidden;
+              border-radius: 14px;
+              border: 1px solid rgba(148,163,184,.35);
+              background: rgba(148,163,184,.18);
+              box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+            }
+            .j-fill{ height:100%; width:0%; background: rgba(59,130,246,.82); }
+            .j-label{
+              position:absolute; inset:0;
+              display:flex; align-items:center; justify-content:center;
+              font-weight: 900; font-size: 13px;
+              color:#0f172a;
+              text-shadow: 0 1px 0 rgba(255,255,255,.65);
+            }
+            .j-done .j-fill{ background: rgba(34,197,94,.85); }
+            .j-done .j-label{ color:#052e16; }
 
-/* ===== Room Card 3D ===== */
-.room-card{
-  border: 1px solid rgba(148,163,184,.35);
-  border-radius: 18px;
-  padding: 14px 14px 10px 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.96));
-  box-shadow: 0 10px 22px rgba(15,23,42,.10);
-  margin: 12px 0;
-  transition: transform .15s ease, box-shadow .15s ease;
-}
-.room-card:hover{
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(15,23,42,.14);
-}
-.room-head{
-  display:flex; justify-content:space-between; align-items:center;
-  gap: 10px; padding: 8px 10px; border-radius: 14px;
-  background: rgba(219,234,254,.85);
-  border: 1px solid rgba(147,197,253,.55);
-}
-.room-title{
-  font-weight: 900; font-size: 18px; color:#0b4aa2;
-  display:flex; align-items:center; gap:10px;
-}
-.room-meta{
-  font-weight: 900; font-size: 13px; color:#0f172a;
-  opacity:.85;
-}
+            /* ===== Room Card 3D ===== */
+            .room-card{
+              border: 1px solid rgba(148,163,184,.35);
+              border-radius: 18px;
+              padding: 14px 14px 10px 14px;
+              background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.96));
+              box-shadow: 0 10px 22px rgba(15,23,42,.10);
+              margin: 12px 0;
+              transition: transform .15s ease, box-shadow .15s ease;
+            }
+            .room-card:hover{
+              transform: translateY(-2px);
+              box-shadow: 0 14px 30px rgba(15,23,42,.14);
+            }
+            .room-head{
+              display:flex; justify-content:space-between; align-items:center;
+              gap: 10px; padding: 8px 10px; border-radius: 14px;
+              background: rgba(219,234,254,.85);
+              border: 1px solid rgba(147,197,253,.55);
+            }
+            .room-title{
+              font-weight: 900; font-size: 18px; color:#0b4aa2;
+              display:flex; align-items:center; gap:10px;
+            }
+            .room-meta{
+              font-weight: 900; font-size: 13px; color:#0f172a;
+              opacity:.85;
+            }
 
-/* ===== Badges ===== */
-.badges-grid{
-  display:grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  padding: 12px 4px 6px 4px;
-}
-.badge-tile{
-  border-radius: 16px;
-  border: 1px solid rgba(148,163,184,.35);
-  background: #fff;
-  padding: 12px 12px;
-  display:flex; gap: 10px; align-items:flex-start;
-  box-shadow: 0 6px 14px rgba(15,23,42,.06);
-  position: relative;
-}
-.badge-ico{ font-size: 22px; line-height: 1; }
-.badge-name{ font-weight: 900; color:#0f172a; }
-.badge-code{ font-size: 12px; color:#64748b; margin-left: 6px; }
-.badge-sub{ font-size: 12px; color:#64748b; margin-top: 6px; }
+            /* ===== Badges ===== */
+            .badges-grid{
+              display:grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 10px;
+              padding: 12px 4px 6px 4px;
+            }
+            .badge-tile{
+              border-radius: 16px;
+              border: 1px solid rgba(148,163,184,.35);
+              background: #fff;
+              padding: 12px 12px;
+              display:flex; gap: 10px; align-items:flex-start;
+              box-shadow: 0 6px 14px rgba(15,23,42,.06);
+              position: relative;
+            }
+            .badge-ico{ font-size: 22px; line-height: 1; }
+            .badge-name{ font-weight: 900; color:#0f172a; }
+            .badge-code{ font-size: 12px; color:#64748b; margin-left: 6px; }
+            .badge-sub{ font-size: 12px; color:#64748b; margin-top: 2px; }
 
-.badge-status{
-  margin-left:auto;
-  font-weight: 900;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(148,163,184,.35);
-  background: rgba(241,245,249,.8);
-  color:#0f172a;
-  white-space: nowrap;
-}
+            .badge-progress{
+              margin-top: 8px;
+              height: 8px;
+              width: 100%;
+              border-radius: 999px;
+              background: rgba(148,163,184,.25);
+              overflow:hidden;
+            }
+            .badge-progress > div{
+              height:100%;
+              width: 0%;
+              border-radius: 999px;
+              background: rgba(59,130,246,.85);
+            }
 
-/* Progress bar under name */
-.badge-progress{
-  margin-top: 8px;
-  height: 8px;
-  width: 100%;
-  border-radius: 999px;
-  background: rgba(148,163,184,.25);
-  overflow:hidden;
-}
-.badge-progress > div{
-  height:100%;
-  width: 0%;
-  border-radius: 999px;
-  background: rgba(59,130,246,.85);
-}
+            /* Locked vs Unlocked */
+            .locked{ opacity:.50; filter: grayscale(1); }
+            .unlocked{
+              opacity:1; filter:none;
+              box-shadow: 0 8px 18px rgba(34,197,94,.12);
+            }
+            .unlocked .badge-progress > div{ background: rgba(34,197,94,.85); }
 
-/* Locked vs Unlocked */
-.locked{
-  opacity:.50;
-  filter: grayscale(1);
-}
-.unlocked{
-  opacity:1;
-  filter:none;
-  box-shadow: 0 8px 18px rgba(34,197,94,.12);
-}
-.unlocked .badge-progress > div{
-  background: rgba(34,197,94,.85);
-}
-.unlocked .badge-status{
-  background: rgba(220,252,231,.9);
-  border-color: rgba(34,197,94,.45);
-}
+            /* Glow (run once) */
+            @keyframes glowPulse {
+              0%   { box-shadow: 0 0 0 rgba(34,197,94,.0); transform: translateY(0); }
+              30%  { box-shadow: 0 0 24px rgba(34,197,94,.35); transform: translateY(-1px); }
+              100% { box-shadow: 0 0 0 rgba(34,197,94,.0); transform: translateY(0); }
+            }
+            .glow-once{
+              animation: glowPulse 1.2s ease-out 1;
+            }
 
-/* ===== Glow-once (only for the badge just completed) ===== */
-@keyframes glowPulseOnce {
-  0%   { box-shadow: 0 6px 14px rgba(15,23,42,.06), 0 0 0 rgba(34,197,94,0); }
-  25%  { box-shadow: 0 10px 22px rgba(34,197,94,.25), 0 0 18px rgba(34,197,94,.35); }
-  60%  { box-shadow: 0 12px 26px rgba(34,197,94,.20), 0 0 22px rgba(34,197,94,.30); }
-  100% { box-shadow: 0 6px 14px rgba(15,23,42,.06), 0 0 0 rgba(34,197,94,0); }
-}
-.glow-once{
-  animation: glowPulseOnce 1.8s ease-in-out 1;
-  border-color: rgba(34,197,94,.55) !important;
-}
-.glow-once::after{
-  content: "🎉";
-  position:absolute;
-  top: -10px; right: -8px;
-  font-size: 18px;
-  transform: rotate(12deg);
-}
-
-/* Mobile */
-@media (max-width: 768px){
-  .badges-grid{ grid-template-columns: 1fr; }
-  .room-title{ font-size: 16px; }
-  .j-label{ font-size: 12px; }
-}
-</style>
-        """,
+            /* Mobile: 1 column badges */
+            @media (max-width: 768px){
+              .badges-grid{ grid-template-columns: 1fr; }
+              .room-title{ font-size: 16px; }
+              .j-label{ font-size: 12px; }
+            }
+            </style>
+            """
+        ),
         unsafe_allow_html=True,
     )
 
     # =========================
-    # 2) Tính progress x/3 cho từng mã bài
+    # 2) Progress x/3 cho từng mã bài
     # =========================
-    prog = {}  # code -> done_attempts (0..3)
+    prog = {c: 0 for c in all_codes_u}
+
     if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
         dfx = df.copy()
         if "exercise_code" in dfx.columns:
             dfx["exercise_code"] = dfx["exercise_code"].astype(str).str.strip().str.upper()
         else:
-            dfx = pd.DataFrame(columns=["exercise_code", "attempt_no"])
+            dfx["exercise_code"] = ""
 
         if "attempt_no" not in dfx.columns:
             dfx["attempt_no"] = 0
 
         g = dfx.groupby("exercise_code")["attempt_no"].nunique()
-        prog = {k: int(min(int(v), 3)) for k, v in g.to_dict().items()}
-
-    all_codes = [it["code"] for rk in BADGE_ORDER for it in BADGE_CATALOG[rk]["items"]]
-    for code in all_codes:
-        code_u = str(code).strip().upper()
-        prog.setdefault(code_u, 0)
+        for k, v in g.to_dict().items():
+            ku = str(k).strip().upper()
+            if ku in prog:
+                prog[ku] = int(min(int(v), 3))
 
     # =========================
-    # 3) Xác định badge vừa đạt 3/3 -> glow đúng 1 lần
+    # 3) Glow per badge khi vừa đạt 3/3 (session flag theo MSSV+code)
     # =========================
     mssv = str(st.session_state.get("LAB_MSSV", "")).strip().upper()
     cache_key = f"BADGE_PROGRESS_CACHE_{mssv}"
-    glow_key = f"BADGE_GLOW_QUEUE_{mssv}"
-
     prev_prog = st.session_state.get(cache_key, {}) or {}
-    just_completed = []
-    for code in all_codes:
-        code_u = str(code).strip().upper()
-        prev = int(prev_prog.get(code_u, 0))
-        now = int(prog.get(code_u, 0))
-        if prev < 3 and now >= 3:
-            just_completed.append(code_u)
 
-    # lưu cache progress mới
+    glow_flags = {}
+    for code in all_codes_u:
+        prev = int(prev_prog.get(code, 0))
+        now = int(prog.get(code, 0))
+        if prev < 3 and now >= 3:
+            glow_flags[code] = True
+            st.session_state[f"GLOW_{mssv}_{code}"] = True
+
+    # cập nhật cache progress (để lần sau biết “vừa đạt”)
     st.session_state[cache_key] = dict(prog)
 
-    # queue glow: chỉ glow ở lần render hiện tại rồi tự clear cuối hàm
-    if just_completed:
-        st.session_state[glow_key] = just_completed
-    glow_queue = set(st.session_state.get(glow_key, []) or [])
-
     # =========================
-    # 4) Progress Journey (5 phòng)
+    # 4) Progress Journey (5 phòng)  ✅ FIX: không bị in HTML như code nữa
     # =========================
-    def _room_done_count(room_key: str) -> tuple[int, int]:
+    def _room_badge_done_count(room_key: str) -> tuple[int, int]:
         items = BADGE_CATALOG[room_key]["items"]
         done = sum(1 for it in items if int(prog.get(it["code"].strip().upper(), 0)) >= 3)
         return done, len(items)
 
-    journey_steps_html = []
+    steps = []
     for rk in BADGE_ORDER:
-        done, total = _room_done_count(rk)
+        done, total = _room_badge_done_count(rk)
         ratio = 0 if total == 0 else int(done / total * 100)
         cls_done = "j-done" if done == total and total > 0 else ""
-        cls0 = "j-0" if ratio == 0 else ""
         # label gọn: bỏ emoji đầu
         label = BADGE_CATALOG[rk]["title"].split(" ", 1)[-1]
-        journey_steps_html.append(
-            f"""
-            <div class="j-step {cls_done} {cls0}">
-              <div class="j-fill" style="width:{ratio}%"></div>
-              <div class="j-label">{label} · {done}/{total}</div>
-            </div>
-            """
+        steps.append(
+            f'<div class="j-step {cls_done}">'
+            f'  <div class="j-fill" style="width:{ratio}%"></div>'
+            f'  <div class="j-label">{label} · {done}/{total}</div>'
+            f"</div>"
         )
 
-    st.markdown(
-        f"""
-        <div class="journey-wrap">
-          <div class="journey-title">
-            <div>🧭 Hành trình nghiệp vụ</div>
-            <div style="font-weight:900; color:#334155; font-size:13px;">
-              Hoàn tất phòng = đạt đủ 2 huy hiệu
-            </div>
-          </div>
-          <div class="journey-bar">
-            {''.join(journey_steps_html)}
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    journey_html = (
+        '<div class="journey-wrap">'
+        '  <div class="journey-title">'
+        '    <div>🧭 Hành trình nghiệp vụ</div>'
+        '    <div style="font-weight:900; color:#334155; font-size:13px;">Hoàn tất phòng = đạt đủ 2 huy hiệu</div>'
+        "  </div>"
+        f'  <div class="journey-bar">{"".join(steps)}</div>'
+        "</div>"
     )
+    st.markdown(journey_html, unsafe_allow_html=True)
 
     # =========================
-    # 5) Render: mỗi phòng 1 card, 2 badge
+    # 5) Render cards + badges
     # =========================
-    def _badge_tile_html(icon: str, name: str, code: str, done: int, glow: bool) -> str:
+    def _badge_tile_html(icon, name, code_u, done):
         done = int(done)
-        done = max(0, min(done, 3))
-        pct = int(done / 3 * 100)
-
+        pct = int(min(max(done, 0), 3) / 3 * 100)
         is_done = done >= 3
+
         cls = "unlocked" if is_done else "locked"
-        glow_cls = "glow-once" if glow else ""
 
-        # Chip trạng thái: chỉ hiển thị ✅/⏳ + x/3 (không cần chữ "Chưa đạt")
-        status = f"✅ {done}/3" if is_done else f"⏳ {done}/3"
+        # glow: nếu badge vừa đạt 3/3 trong session -> thêm class glow-once
+        glow = st.session_state.get(f"GLOW_{mssv}_{code_u}", False)
+        glow_cls = " glow-once" if glow else ""
 
-        return f"""
-        <div class="badge-tile {cls} {glow_cls}">
-          <div class="badge-ico">{icon}</div>
-          <div style="flex:1; min-width:0;">
-            <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
-              <span class="badge-name">{name}</span>
-              <span class="badge-code">({code})</span>
-            </div>
-            <div class="badge-progress"><div style="width:{pct}%"></div></div>
-            <div class="badge-sub">Tiến độ chuyên cần: {done}/3 lần</div>
-          </div>
-          <div class="badge-status">{status}</div>
-        </div>
-        """
+        return (
+            f'<div class="badge-tile {cls}{glow_cls}">'
+            f'  <div class="badge-ico">{icon}</div>'
+            f'  <div style="flex:1; min-width:0;">'
+            f'    <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">'
+            f'      <span class="badge-name">{name}</span>'
+            f'      <span class="badge-code">({code_u})</span>'
+            f"    </div>"
+            f'    <div class="badge-progress"><div style="width:{pct}%"></div></div>'
+            f'    <div class="badge-sub">Tiến độ chuyên cần: {done}/3 lần</div>'
+            f"  </div>"
+            f"</div>"
+        )
 
-    def _room_card_html(room_title: str, tiles_html: str, solved_badges: int, total_badges: int) -> str:
-        return f"""
-        <div class="room-card">
-          <div class="room-head">
-            <div class="room-title">{room_title}</div>
-            <div class="room-meta">🎖️ {solved_badges}/{total_badges} huy hiệu</div>
-          </div>
-          <div class="badges-grid">
-            {tiles_html}
-          </div>
-        </div>
-        """
+    def _room_card_html(room_title, tiles_html, solved_badges, total_badges):
+        return (
+            '<div class="room-card">'
+            '  <div class="room-head">'
+            f'    <div class="room-title">{room_title}</div>'
+            f'    <div class="room-meta">🎖️ {solved_badges}/{total_badges} huy hiệu</div>'
+            "  </div>"
+            f'  <div class="badges-grid">{tiles_html}</div>'
+            "</div>"
+        )
 
     for rk in BADGE_ORDER:
         room = BADGE_CATALOG.get(rk)
@@ -5079,23 +5022,15 @@ def render_my_badges(df: "pd.DataFrame"):
             done = int(prog.get(code_u, 0))
             if done >= 3:
                 solved += 1
-
-            # glow đúng badge vừa đạt 3/3 ở lần render này
-            glow = code_u in glow_queue
-            tiles.append(_badge_tile_html(it["icon"], it["name"], code_u, done, glow))
+            tiles.append(_badge_tile_html(it["icon"], it["name"], code_u, done))
 
         st.markdown(
-            _room_card_html(room["title"], "\n".join(tiles), solved, total_badges=len(room["items"])),
+            _room_card_html(room["title"], "".join(tiles), solved, total_badges=len(room["items"])),
             unsafe_allow_html=True,
         )
 
-    # =========================
-    # 6) Clear glow queue để glow chỉ chạy 1 lần
-    # =========================
-    if glow_key in st.session_state:
-        st.session_state.pop(glow_key, None)
+    st.caption("💡 Huy hiệu sáng lên khi bạn làm đủ **3/3** cho đúng mã bài. Progress bar giúp bạn biết còn thiếu bao nhiêu.")
 
-    st.caption("💡 Mỗi huy hiệu nhận khi bạn làm đủ **3 lần (3/3)** cho đúng mã bài. Progress bar giúp bạn biết còn thiếu bao nhiêu.")
 
 # ===== KẾT THÚC BADGES HUY HIỆU CHO TỪNG MÃ BÀI ======
 

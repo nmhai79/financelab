@@ -4707,86 +4707,374 @@ def _badge_progress_map(df_attempts: "pd.DataFrame") -> dict:
     return {k: int(min(v, 3)) for k, v in g.to_dict().items()}
 
 
-def render_my_badges(df_attempts: "pd.DataFrame"):
+def render_my_badges(df: "pd.DataFrame"):
     """
-    Render 5 cards (mỗi phòng 2 huy hiệu), badge đạt khi attempts_done >= 3.
+    Render huy hiệu theo dạng:
+    - Progress Journey (5 phòng)
+    - Mỗi phòng 1 card 3D, bên trong 2 badge
+    - Badge có progress bar (0-100%) theo số lần nộp (x/3)
+    - st.balloons() 1 lần khi vừa đạt 3/3 lần đầu
     """
-    st.subheader("🎖️ Huy hiệu chuyên cần")
-    st.caption("Mỗi huy hiệu đạt khi bạn làm đủ **3 lần** cho **mỗi mã bài** (Attempt 1–2–3).")
+    import pandas as pd
+    import streamlit as st
 
-    prog = _badge_progress_map(df_attempts)
+    # =========================
+    # 0) Catalog huy hiệu
+    # =========================
+    BADGE_ORDER = ["DEALING", "RISK", "TRADE", "INVEST", "MACRO"]
 
-    # CSS nhẹ cho dòng huy hiệu (không phá CSS tổng)
+    BADGE_CATALOG = {
+        "DEALING": {
+            "title": "💱 Sàn Kinh doanh Ngoại hối",
+            "items": [
+                {"code": "D01", "name": "Niêm yết Tỷ giá Chéo", "icon": "🧮"},
+                {"code": "D02", "name": "Săn Arbitrage Tam giác", "icon": "🚩"},
+            ],
+        },
+        "RISK": {
+            "title": "🛡️ Phòng Quản trị Rủi ro",
+            "items": [
+                {"code": "R01", "name": "Phòng vệ Forward", "icon": "🛡️"},
+                {"code": "R02", "name": "Chọn Hedge Tối ưu", "icon": "🎯"},
+            ],
+        },
+        "TRADE": {
+            "title": "🚢 Phòng Thanh toán Quốc tế",
+            "items": [
+                {"code": "T01", "name": "Tối ưu Chi phí Thanh toán", "icon": "💰"},
+                {"code": "T02", "name": "Soi Sai Biệt Chứng từ", "icon": "🧾"},
+            ],
+        },
+        "INVEST": {
+            "title": "🏭 Phòng Đầu tư Quốc tế",
+            "items": [
+                {"code": "I01", "name": "Thẩm định NPV", "icon": "📈"},
+                {"code": "I02", "name": "IRR vs WACC", "icon": "⚖️"},
+            ],
+        },
+        "MACRO": {
+            "title": "📉 Ban Chiến lược Vĩ mô",
+            "items": [
+                {"code": "M01", "name": "Cú sốc Tỷ giá & Nợ công", "icon": "🌍"},
+                {"code": "M02", "name": "Carry Trade Unwind", "icon": "💸"},
+            ],
+        },
+    }
+
+    # =========================
+    # 1) CSS UI (3D card + badge progress + journey)
+    # =========================
     st.markdown(
         """
 <style>
-.badge-line{
-  display:flex; align-items:center; justify-content:space-between;
-  gap:10px; padding:10px 10px; border-radius:12px;
-  background:#ffffff; border:1px solid #e5e7eb;
-  margin:8px 0;
+/* ===== Journey ===== */
+.journey-wrap{
+  margin: 10px 0 14px 0;
+  padding: 12px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: linear-gradient(180deg, rgba(255,255,255,.94), rgba(248,250,252,.94));
+  box-shadow: 0 10px 22px rgba(15,23,42,.08);
 }
-.badge-left{ display:flex; align-items:center; gap:10px; }
-.badge-name{ font-weight:800; color:#111827; }
-.badge-code{ font-size:12px; color:#6b7280; margin-left:8px; }
-.badge-right{ font-weight:900; }
-.badge-done{ color:#16a34a; }  /* xanh */
-.badge-todo{ color:#f59e0b; }  /* vàng */
+.journey-title{
+  font-weight: 900; color:#0f172a; margin-bottom: 10px;
+  display:flex; justify-content:space-between; align-items:center; gap:10px;
+}
+.journey-bar{
+  display:flex; gap: 10px; align-items:center;
+}
+.j-step{
+  flex:1;
+  border-radius: 14px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(148,163,184,.18);
+  overflow:hidden;
+  height: 36px;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25);
+}
+.j-fill{
+  height:100%;
+  width:0%;
+  background: rgba(59,130,246,.82);
+}
+.j-label{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  font-weight: 900; font-size: 13px;
+  color:#0f172a;
+  text-shadow: 0 1px 0 rgba(255,255,255,.65);
+}
+.j-done .j-fill{ background: rgba(34,197,94,.85); }
+.j-done .j-label{ color:#052e16; }
+.j-0 .j-label{ opacity:.85; }
+
+/* ===== Room Card 3D ===== */
+.room-card{
+  border: 1px solid rgba(148,163,184,.35);
+  border-radius: 18px;
+  padding: 14px 14px 10px 14px;
+  background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(248,250,252,.96));
+  box-shadow: 0 10px 22px rgba(15,23,42,.10);
+  margin: 12px 0;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.room-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(15,23,42,.14);
+}
+.room-head{
+  display:flex; justify-content:space-between; align-items:center;
+  gap: 10px; padding: 8px 10px; border-radius: 14px;
+  background: rgba(219,234,254,.85);
+  border: 1px solid rgba(147,197,253,.55);
+}
+.room-title{
+  font-weight: 900; font-size: 18px; color:#0b4aa2;
+  display:flex; align-items:center; gap:10px;
+}
+.room-meta{
+  font-weight: 900; font-size: 13px; color:#0f172a;
+  opacity:.85;
+}
+
+/* ===== Badges ===== */
+.badges-grid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 12px 4px 6px 4px;
+}
+.badge-tile{
+  border-radius: 16px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: #fff;
+  padding: 12px 12px;
+  display:flex; gap: 10px; align-items:flex-start;
+  box-shadow: 0 6px 14px rgba(15,23,42,.06);
+}
+.badge-ico{ font-size: 22px; line-height: 1; }
+.badge-name{ font-weight: 900; color:#0f172a; }
+.badge-code{ font-size: 12px; color:#64748b; margin-left: 6px; }
+.badge-sub{ font-size: 12px; color:#64748b; margin-top: 2px; }
+
+.badge-status{
+  margin-left:auto;
+  font-weight: 900;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(241,245,249,.8);
+  color:#0f172a;
+  white-space: nowrap;
+}
+
+/* Progress bar under name */
+.badge-progress{
+  margin-top: 8px;
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(148,163,184,.25);
+  overflow:hidden;
+}
+.badge-progress > div{
+  height:100%;
+  width: 0%;
+  border-radius: 999px;
+  background: rgba(59,130,246,.85);
+}
+
+/* Locked vs Unlocked */
+.locked{
+  opacity:.50;
+  filter: grayscale(1);
+}
+.locked .badge-status{
+  background: rgba(254,243,199,.75);
+  border-color: rgba(251,191,36,.5);
+}
+.unlocked{
+  opacity:1;
+  filter:none;
+  box-shadow: 0 8px 18px rgba(34,197,94,.12);
+}
+.unlocked .badge-status{
+  background: rgba(220,252,231,.9);
+  border-color: rgba(34,197,94,.45);
+}
+.unlocked .badge-progress > div{
+  background: rgba(34,197,94,.85);
+}
+
+/* Mobile: 1 column badges */
+@media (max-width: 768px){
+  .badges-grid{ grid-template-columns: 1fr; }
+  .room-title{ font-size: 16px; }
+  .j-label{ font-size: 12px; }
+}
 </style>
         """,
         unsafe_allow_html=True,
     )
 
-    # 5 phòng -> render theo grid 2 cột (mobile sẽ tự stack nhờ CSS của bạn)
-    pairs = [(BADGE_ORDER[i], BADGE_ORDER[i + 1]) for i in range(0, len(BADGE_ORDER) - 1, 2)]
-    if len(BADGE_ORDER) % 2 == 1:
-        pairs.append((BADGE_ORDER[-1], None))
+    # =========================
+    # 2) Tính progress x/3 cho từng mã bài
+    # =========================
+    # df = lịch sử nộp của SV (lab_attempts) => có thể rỗng
+    prog = {}  # code -> done_attempts (0..3)
+    if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
+        dfx = df.copy()
+        if "exercise_code" in dfx.columns:
+            dfx["exercise_code"] = dfx["exercise_code"].astype(str).str.strip().str.upper()
+        else:
+            # thiếu cột => coi như chưa làm gì
+            dfx = pd.DataFrame(columns=["exercise_code", "attempt_no"])
 
-    for left_key, right_key in pairs:
-        colL, colR = st.columns(2)
+        if "attempt_no" not in dfx.columns:
+            dfx["attempt_no"] = 0
 
-        def _render_room_card(room_key: str, container):
-            if not room_key:
-                return
-            room = BADGE_CATALOG.get(room_key)
-            if not room:
-                return
+        # số lần đã nộp theo mã bài (đếm attempt_no khác nhau)
+        g = dfx.groupby("exercise_code")["attempt_no"].nunique()
+        prog = {k: int(min(int(v), 3)) for k, v in g.to_dict().items()}
 
-            with container:
-                st.markdown(
-                    f"""
-<div class="role-card">
-  <div class="role-title">{room["title"]}</div>
-</div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+    # đảm bảo đủ 10 mã
+    all_codes = [it["code"] for rk in BADGE_ORDER for it in BADGE_CATALOG[rk]["items"]]
+    for code in all_codes:
+        code_u = str(code).strip().upper()
+        prog.setdefault(code_u, 0)
 
-                # render 2 badge lines
-                for it in room["items"]:
-                    code = it["code"].strip().upper()
-                    done = int(prog.get(code, 0))
-                    is_done = done >= 3
-                    status = "✅" if is_done else "⏳"
-                    status_cls = "badge-done" if is_done else "badge-todo"
-                    st.markdown(
-                        f"""
-<div class="badge-line">
-  <div class="badge-left">
-    <div style="font-size:22px; line-height:1">{it["icon"]}</div>
-    <div>
-      <span class="badge-name">{it["name"]}</span>
-      <span class="badge-code">({code})</span>
-    </div>
-  </div>
-  <div class="badge-right {status_cls}">{status} {done}/3</div>
-</div>
-                        """,
-                        unsafe_allow_html=True,
-                    )
+    # =========================
+    # 3) Congrats (bắn balloons đúng 1 lần khi vừa đạt 3/3)
+    # =========================
+    mssv = str(st.session_state.get("LAB_MSSV", "")).strip().upper()
+    balloon_key = f"BADGE_BALLOON_SHOWN_{mssv}"
+    cache_key = f"BADGE_PROGRESS_CACHE_{mssv}"
 
-        _render_room_card(left_key, colL)
-        _render_room_card(right_key, colR)
+    prev_prog = st.session_state.get(cache_key, {}) or {}
+    just_completed = []
+
+    for code in all_codes:
+        code_u = str(code).strip().upper()
+        prev = int(prev_prog.get(code_u, 0))
+        now = int(prog.get(code_u, 0))
+        # chỉ tính "vừa đạt" khi trước đó <3 và bây giờ =3
+        if prev < 3 and now >= 3:
+            just_completed.append(code_u)
+
+    # cập nhật cache progress
+    st.session_state[cache_key] = dict(prog)
+
+    # balloons: chỉ bắn 1 lần, và chỉ khi có badge vừa đạt
+    if just_completed and not st.session_state.get(balloon_key, False):
+        st.balloons()
+        st.session_state[balloon_key] = True
+
+    # =========================
+    # 4) Progress Journey (5 phòng)
+    # =========================
+    def _room_badge_done_count(room_key: str) -> tuple[int, int]:
+        items = BADGE_CATALOG[room_key]["items"]
+        done = sum(1 for it in items if int(prog.get(it["code"].strip().upper(), 0)) >= 3)
+        return done, len(items)
+
+    journey_steps_html = []
+    for rk in BADGE_ORDER:
+        done, total = _room_badge_done_count(rk)
+        ratio = 0 if total == 0 else int(done / total * 100)
+        cls_done = "j-done" if done == total and total > 0 else ""
+        cls0 = "j-0" if ratio == 0 else ""
+        label = BADGE_CATALOG[rk]["title"].split(" ", 1)[-1]  # bỏ emoji đầu để gọn
+        journey_steps_html.append(
+            f"""
+            <div class="j-step {cls_done} {cls0}">
+              <div class="j-fill" style="width:{ratio}%"></div>
+              <div class="j-label">{label} · {done}/{total}</div>
+            </div>
+            """
+        )
+
+    st.markdown(
+        f"""
+        <div class="journey-wrap">
+          <div class="journey-title">
+            <div>🧭 Hành trình nghiệp vụ</div>
+            <div style="font-weight:900; color:#334155; font-size:13px;">
+              Hoàn tất phòng = đạt đủ 2 huy hiệu
+            </div>
+          </div>
+          <div class="journey-bar">
+            {''.join(journey_steps_html)}
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # =========================
+    # 5) Render: mỗi phòng 1 card, 2 badge
+    # =========================
+    def _badge_tile_html(icon, name, code, done):
+        done = int(done)
+        pct = int(min(max(done, 0), 3) / 3 * 100)
+        is_done = done >= 3
+        cls = "unlocked" if is_done else "locked"
+        status_text = "Đã đạt" if is_done else "Chưa đạt"
+        status = f"✅ {done}/3" if is_done else f"⏳ {done}/3"
+
+        return f"""
+        <div class="badge-tile {cls}">
+          <div class="badge-ico">{icon}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+              <span class="badge-name">{name}</span>
+              <span class="badge-code">({code})</span>
+            </div>
+            <div class="badge-progress"><div style="width:{pct}%"></div></div>
+            <div class="badge-sub">Tiến độ chuyên cần: {done}/3 lần</div>
+          </div>
+          <div class="badge-status">{status_text} · {status}</div>
+        </div>
+        """
+
+    def _room_card_html(room_title, tiles_html, solved_badges, total_badges):
+        return f"""
+        <div class="room-card">
+          <div class="room-head">
+            <div class="room-title">{room_title}</div>
+            <div class="room-meta">🎖️ {solved_badges}/{total_badges} huy hiệu</div>
+          </div>
+          <div class="badges-grid">
+            {tiles_html}
+          </div>
+        </div>
+        """
+
+    for rk in BADGE_ORDER:
+        room = BADGE_CATALOG.get(rk)
+        if not room:
+            continue
+
+        tiles = []
+        solved = 0
+        for it in room["items"]:
+            code_u = it["code"].strip().upper()
+            done = int(prog.get(code_u, 0))
+            if done >= 3:
+                solved += 1
+            tiles.append(_badge_tile_html(it["icon"], it["name"], code_u, done))
+
+        st.markdown(
+            _room_card_html(room["title"], "\n".join(tiles), solved, total_badges=len(room["items"])),
+            unsafe_allow_html=True,
+        )
+
+    # =========================
+    # 6) Hint nhỏ (optional)
+    # =========================
+    st.caption("💡 Mỗi huy hiệu nhận khi bạn làm đủ **3 lần (3/3)** cho đúng mã bài. Progress bar giúp bạn biết còn thiếu bao nhiêu.")
+
 
 
 # ======= PHÒNG 6 BẢNG VÀNG THÀNH TÍCH ========
@@ -4992,8 +5280,10 @@ def room_6_leaderboard():
             df["attempt_no"] = pd.to_numeric(df["attempt_no"], errors="coerce").fillna(0).astype(int)
             df["is_correct"] = df["is_correct"].astype(bool)
 
+            st.markdown("---")
             # Sau khi đã có df (lịch sử nộp bài của SV)
             render_my_badges(df)
+            st.markdown("---")
 
             # Best-of-3 theo từng bài
             per_ex = (

@@ -5221,23 +5221,23 @@ def render_my_badges(df: "pd.DataFrame"):
             """
         )
 
-    st.markdown(
-        f"""
-        <div class="jp-wrap">
-        <div class="jp-title">
-            <div>🧭 Hành trình nghiệp vụ</div>
-            <div style="font-weight:900; color:#334155; font-size:13px;">
-            Hoàn tất phòng = đạt đủ 2 huy hiệu
-            </div>
-        </div>
-        <div class="jp-row">
-            {''.join(pills_html)}
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    import textwrap
 
+    html = textwrap.dedent(f"""
+    <div class="jp-wrap">
+    <div class="jp-title">
+        <div>🧭 Hành trình nghiệp vụ</div>
+        <div style="font-weight:900; color:#334155; font-size:13px;">
+        Hoàn tất phòng = đạt đủ 2 huy hiệu
+        </div>
+    </div>
+    <div class="jp-row">
+        {''.join(pills_html)}
+    </div>
+    </div>
+    """)
+
+    st.markdown(html, unsafe_allow_html=True)
 
     # =========================
     # 5) Render cards + badges

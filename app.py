@@ -4709,11 +4709,12 @@ def _badge_progress_map(df_attempts: "pd.DataFrame") -> dict:
 
 def render_my_badges(df: "pd.DataFrame"):
     """
-    Render huy hiệu theo dạng:
+    UI huy hiệu (10 mã) theo yêu cầu:
     - Progress Journey (5 phòng)
     - Mỗi phòng 1 card 3D, bên trong 2 badge
-    - Badge có progress bar (0-100%) theo số lần nộp (x/3)
-    - st.balloons() 1 lần khi vừa đạt 3/3 lần đầu
+    - Badge có progress bar (0–100%) theo số lần nộp (x/3)
+    - KHÔNG balloons / KHÔNG toast
+    - Chỉ "glow" đúng badge vừa đạt 3/3 (mỗi badge glow đúng 1 lần, tự tắt ở lần rerun kế tiếp)
     """
     import pandas as pd
     import streamlit as st
@@ -4762,7 +4763,7 @@ def render_my_badges(df: "pd.DataFrame"):
     }
 
     # =========================
-    # 1) CSS UI (3D card + badge progress + journey)
+    # 1) CSS (3D card + badge progress + journey + glow-once)
     # =========================
     st.markdown(
         """
@@ -4852,11 +4853,12 @@ def render_my_badges(df: "pd.DataFrame"):
   padding: 12px 12px;
   display:flex; gap: 10px; align-items:flex-start;
   box-shadow: 0 6px 14px rgba(15,23,42,.06);
+  position: relative;
 }
 .badge-ico{ font-size: 22px; line-height: 1; }
 .badge-name{ font-weight: 900; color:#0f172a; }
 .badge-code{ font-size: 12px; color:#64748b; margin-left: 6px; }
-.badge-sub{ font-size: 12px; color:#64748b; margin-top: 2px; }
+.badge-sub{ font-size: 12px; color:#64748b; margin-top: 6px; }
 
 .badge-status{
   margin-left:auto;
@@ -4891,24 +4893,39 @@ def render_my_badges(df: "pd.DataFrame"):
   opacity:.50;
   filter: grayscale(1);
 }
-.locked .badge-status{
-  background: rgba(254,243,199,.75);
-  border-color: rgba(251,191,36,.5);
-}
 .unlocked{
   opacity:1;
   filter:none;
   box-shadow: 0 8px 18px rgba(34,197,94,.12);
 }
+.unlocked .badge-progress > div{
+  background: rgba(34,197,94,.85);
+}
 .unlocked .badge-status{
   background: rgba(220,252,231,.9);
   border-color: rgba(34,197,94,.45);
 }
-.unlocked .badge-progress > div{
-  background: rgba(34,197,94,.85);
+
+/* ===== Glow-once (only for the badge just completed) ===== */
+@keyframes glowPulseOnce {
+  0%   { box-shadow: 0 6px 14px rgba(15,23,42,.06), 0 0 0 rgba(34,197,94,0); }
+  25%  { box-shadow: 0 10px 22px rgba(34,197,94,.25), 0 0 18px rgba(34,197,94,.35); }
+  60%  { box-shadow: 0 12px 26px rgba(34,197,94,.20), 0 0 22px rgba(34,197,94,.30); }
+  100% { box-shadow: 0 6px 14px rgba(15,23,42,.06), 0 0 0 rgba(34,197,94,0); }
+}
+.glow-once{
+  animation: glowPulseOnce 1.8s ease-in-out 1;
+  border-color: rgba(34,197,94,.55) !important;
+}
+.glow-once::after{
+  content: "🎉";
+  position:absolute;
+  top: -10px; right: -8px;
+  font-size: 18px;
+  transform: rotate(12deg);
 }
 
-/* Mobile: 1 column badges */
+/* Mobile */
 @media (max-width: 768px){
   .badges-grid{ grid-template-columns: 1fr; }
   .room-title{ font-size: 16px; }
@@ -4922,70 +4939,65 @@ def render_my_badges(df: "pd.DataFrame"):
     # =========================
     # 2) Tính progress x/3 cho từng mã bài
     # =========================
-    # df = lịch sử nộp của SV (lab_attempts) => có thể rỗng
     prog = {}  # code -> done_attempts (0..3)
     if df is not None and isinstance(df, pd.DataFrame) and not df.empty:
         dfx = df.copy()
         if "exercise_code" in dfx.columns:
             dfx["exercise_code"] = dfx["exercise_code"].astype(str).str.strip().str.upper()
         else:
-            # thiếu cột => coi như chưa làm gì
             dfx = pd.DataFrame(columns=["exercise_code", "attempt_no"])
 
         if "attempt_no" not in dfx.columns:
             dfx["attempt_no"] = 0
 
-        # số lần đã nộp theo mã bài (đếm attempt_no khác nhau)
         g = dfx.groupby("exercise_code")["attempt_no"].nunique()
         prog = {k: int(min(int(v), 3)) for k, v in g.to_dict().items()}
 
-    # đảm bảo đủ 10 mã
     all_codes = [it["code"] for rk in BADGE_ORDER for it in BADGE_CATALOG[rk]["items"]]
     for code in all_codes:
         code_u = str(code).strip().upper()
         prog.setdefault(code_u, 0)
 
     # =========================
-    # 3) Congrats (bắn balloons đúng 1 lần khi vừa đạt 3/3)
+    # 3) Xác định badge vừa đạt 3/3 -> glow đúng 1 lần
     # =========================
     mssv = str(st.session_state.get("LAB_MSSV", "")).strip().upper()
-    balloon_key = f"BADGE_BALLOON_SHOWN_{mssv}"
     cache_key = f"BADGE_PROGRESS_CACHE_{mssv}"
+    glow_key = f"BADGE_GLOW_QUEUE_{mssv}"
 
     prev_prog = st.session_state.get(cache_key, {}) or {}
     just_completed = []
-
     for code in all_codes:
         code_u = str(code).strip().upper()
         prev = int(prev_prog.get(code_u, 0))
         now = int(prog.get(code_u, 0))
-        # chỉ tính "vừa đạt" khi trước đó <3 và bây giờ =3
         if prev < 3 and now >= 3:
             just_completed.append(code_u)
 
-    # cập nhật cache progress
+    # lưu cache progress mới
     st.session_state[cache_key] = dict(prog)
 
-    # balloons: chỉ bắn 1 lần, và chỉ khi có badge vừa đạt
-    if just_completed and not st.session_state.get(balloon_key, False):
-        st.balloons()
-        st.session_state[balloon_key] = True
+    # queue glow: chỉ glow ở lần render hiện tại rồi tự clear cuối hàm
+    if just_completed:
+        st.session_state[glow_key] = just_completed
+    glow_queue = set(st.session_state.get(glow_key, []) or [])
 
     # =========================
     # 4) Progress Journey (5 phòng)
     # =========================
-    def _room_badge_done_count(room_key: str) -> tuple[int, int]:
+    def _room_done_count(room_key: str) -> tuple[int, int]:
         items = BADGE_CATALOG[room_key]["items"]
         done = sum(1 for it in items if int(prog.get(it["code"].strip().upper(), 0)) >= 3)
         return done, len(items)
 
     journey_steps_html = []
     for rk in BADGE_ORDER:
-        done, total = _room_badge_done_count(rk)
+        done, total = _room_done_count(rk)
         ratio = 0 if total == 0 else int(done / total * 100)
         cls_done = "j-done" if done == total and total > 0 else ""
         cls0 = "j-0" if ratio == 0 else ""
-        label = BADGE_CATALOG[rk]["title"].split(" ", 1)[-1]  # bỏ emoji đầu để gọn
+        # label gọn: bỏ emoji đầu
+        label = BADGE_CATALOG[rk]["title"].split(" ", 1)[-1]
         journey_steps_html.append(
             f"""
             <div class="j-step {cls_done} {cls0}">
@@ -5015,16 +5027,20 @@ def render_my_badges(df: "pd.DataFrame"):
     # =========================
     # 5) Render: mỗi phòng 1 card, 2 badge
     # =========================
-    def _badge_tile_html(icon, name, code, done):
+    def _badge_tile_html(icon: str, name: str, code: str, done: int, glow: bool) -> str:
         done = int(done)
-        pct = int(min(max(done, 0), 3) / 3 * 100)
+        done = max(0, min(done, 3))
+        pct = int(done / 3 * 100)
+
         is_done = done >= 3
         cls = "unlocked" if is_done else "locked"
-        status_text = "Đã đạt" if is_done else "Chưa đạt"
+        glow_cls = "glow-once" if glow else ""
+
+        # Chip trạng thái: chỉ hiển thị ✅/⏳ + x/3 (không cần chữ "Chưa đạt")
         status = f"✅ {done}/3" if is_done else f"⏳ {done}/3"
 
         return f"""
-        <div class="badge-tile {cls}">
+        <div class="badge-tile {cls} {glow_cls}">
           <div class="badge-ico">{icon}</div>
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
@@ -5034,11 +5050,11 @@ def render_my_badges(df: "pd.DataFrame"):
             <div class="badge-progress"><div style="width:{pct}%"></div></div>
             <div class="badge-sub">Tiến độ chuyên cần: {done}/3 lần</div>
           </div>
-          <div class="badge-status">{status_text} · {status}</div>
+          <div class="badge-status">{status}</div>
         </div>
         """
 
-    def _room_card_html(room_title, tiles_html, solved_badges, total_badges):
+    def _room_card_html(room_title: str, tiles_html: str, solved_badges: int, total_badges: int) -> str:
         return f"""
         <div class="room-card">
           <div class="room-head">
@@ -5063,7 +5079,10 @@ def render_my_badges(df: "pd.DataFrame"):
             done = int(prog.get(code_u, 0))
             if done >= 3:
                 solved += 1
-            tiles.append(_badge_tile_html(it["icon"], it["name"], code_u, done))
+
+            # glow đúng badge vừa đạt 3/3 ở lần render này
+            glow = code_u in glow_queue
+            tiles.append(_badge_tile_html(it["icon"], it["name"], code_u, done, glow))
 
         st.markdown(
             _room_card_html(room["title"], "\n".join(tiles), solved, total_badges=len(room["items"])),
@@ -5071,11 +5090,14 @@ def render_my_badges(df: "pd.DataFrame"):
         )
 
     # =========================
-    # 6) Hint nhỏ (optional)
+    # 6) Clear glow queue để glow chỉ chạy 1 lần
     # =========================
+    if glow_key in st.session_state:
+        st.session_state.pop(glow_key, None)
+
     st.caption("💡 Mỗi huy hiệu nhận khi bạn làm đủ **3 lần (3/3)** cho đúng mã bài. Progress bar giúp bạn biết còn thiếu bao nhiêu.")
 
-
+# ===== KẾT THÚC BADGES HUY HIỆU CHO TỪNG MÃ BÀI ======
 
 # ======= PHÒNG 6 BẢNG VÀNG THÀNH TÍCH ========
 def room_6_leaderboard():

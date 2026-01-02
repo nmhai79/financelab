@@ -5198,44 +5198,36 @@ def render_my_badges(df: "pd.DataFrame"):
     pills_html = []
     for rk in BADGE_ORDER:
         done, total = _room_badge_done_count(rk)
-        # trạng thái 0/1/2 (vì mỗi phòng 2 badge)
-        state = min(max(done, 0), total)  # 0..2
-        cls = f"jp-{state}"               # jp-0 / jp-1 / jp-2
+        ratio = 0 if total == 0 else int(done / total * 100)
 
-        # label ngắn gọn
-        full_title = BADGE_CATALOG[rk]["title"]
-        # tooltip đầy đủ cho cả PC + mobile
-        tip = f"{full_title} • {done}/{total} huy hiệu"
+        # label gọn (bỏ emoji đầu)
+        room_title = BADGE_CATALOG[rk]["title"]
+        parts = room_title.split(" ", 1)
+        label = parts[1] if len(parts) > 1 else room_title
 
-        ico = ROOM_ICON.get(rk, "🏁")
+        cls = "jp-2" if done == total else ("jp-1" if done > 0 else "jp-0")
+
         pills_html.append(
-            f"""
-            <div class="jp-pill {cls}" title="{tip}">
-            <div class="jp-fill"></div>
-            <div class="jp-text">
-                <span class="jp-ico">{ico}</span>
-                <span class="jp-name">{rk}</span>
-                <span class="jp-count">{done}/{total}</span>
-            </div>
-            </div>
-            """
+            f'<div class="jp-pill {cls}" title="{label} • {done}/{total} huy hiệu">'
+            f'  <div class="jp-fill" style="width:{ratio}%"></div>'
+            f'  <div class="jp-text"><span class="jp-ico">{room_title.split(" ")[0]}</span>'
+            f'  <span class="jp-name">{rk}</span>'
+            f'  <span class="jp-count">{done}/{total}</span></div>'
+            f'</div>'
         )
 
-    import textwrap
 
-    html = textwrap.dedent(f"""
-    <div class="jp-wrap">
-    <div class="jp-title">
-        <div>🧭 Hành trình nghiệp vụ</div>
-        <div style="font-weight:900; color:#334155; font-size:13px;">
-        Hoàn tất phòng = đạt đủ 2 huy hiệu
-        </div>
-    </div>
-    <div class="jp-row">
-        {''.join(pills_html)}
-    </div>
-    </div>
-    """)
+    html = (
+    f'<div class="jp-wrap">'
+    f'  <div class="jp-title">'
+    f'    <div>🧭 Hành trình nghiệp vụ</div>'
+    f'    <div style="font-weight:900; color:#334155; font-size:13px;">Hoàn tất phòng = đạt đủ 2 huy hiệu</div>'
+    f'  </div>'
+    f'  <div class="jp-row">'
+    f'    {"".join(pills_html)}'
+    f'  </div>'
+    f'</div>'
+    )
 
     st.markdown(html, unsafe_allow_html=True)
 

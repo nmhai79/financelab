@@ -5643,13 +5643,45 @@ def room_6_leaderboard():
                 df[col] = 0
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0).astype(int)
 
+        # =========================
+        # ✅ DEDUP: 1 MSSV = 1 dòng
+        # =========================
+        # normalize mssv mạnh hơn (tránh 34.0)
+        df["mssv"] = (
+            df["mssv"].astype(str).str.strip().str.upper()
+            .str.replace(r"\.0$", "", regex=True)
+        )
+
+        # Nếu vẫn bị trùng MSSV -> gộp lại
+        if df["mssv"].duplicated().any():
+
+            def pick_last_non_empty(s: "pd.Series") -> str:
+                s = s.fillna("").astype(str).str.strip()
+                s = s[s != ""]
+                return s.iloc[-1] if len(s) else ""
+
+            agg = {
+                "hoten": pick_last_non_empty,      # lấy tên tốt nhất
+                "total_score": "max",              # tránh cộng đôi nếu trùng dòng
+                "total_correct": "max",
+                "exercises_done": "max",
+            }
+
+            # nếu có cột lớp / thời điểm nộp gần nhất thì giữ thêm (nếu bạn có)
+            if "lop" in df.columns:
+                agg["lop"] = pick_last_non_empty
+            if "last_submit" in df.columns:
+                agg["last_submit"] = "max"
+
+            df = df.groupby("mssv", as_index=False).agg(agg)
+
+        # (optional) debug nhanh xem còn trùng không
+        # st.caption(f"DEBUG dup_mssv={int(df['mssv'].duplicated().sum())}")
 
         # 4) Sort + Rank
         sort_cols = ["total_score", "total_correct", "exercises_done"]
         df = df.sort_values(sort_cols, ascending=[False, False, False]).reset_index(drop=True)
         df.insert(0, "Rank", df.index + 1)
-
-
 
         # Bộ lọc/search
         c1, c2 = st.columns([2, 1])

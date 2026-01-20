@@ -1,0 +1,22 @@
+name: Wake up Supabase
+
+on:
+  schedule:
+    # Chạy vào 00:00 UTC mỗi 2 ngày (đảm bảo dưới 7 ngày)
+    - cron: '0 0 */5 * *'
+  workflow_dispatch: # Cho phép bấm chạy thủ công để test
+
+jobs:
+  ping_database:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase URL
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          # Gọi lệnh đơn giản lấy thông tin từ bảng user_quota (hoặc bảng bất kỳ)
+          # Chỉ cần có request là Supabase tính là Active
+          curl -X GET "$SUPABASE_URL/rest/v1/user_quota?select=mssv&limit=1" \
+          -H "apikey: $SUPABASE_KEY" \
+          -H "Authorization: Bearer $SUPABASE_KEY"
